@@ -28,7 +28,7 @@ Project Nexus is a Model Context Protocol (MCP) server that provides fine-graine
 - Caching layer for improved performance
 
 ## Overview
-The Model Context Protocol has rapidly gained traction as an open standard for connecting AI agents with external tools and data. By early 2025, developers had created over 1,000+ MCP servers for various services, with major players like OpenAI, Anthropic (Claude), Google DeepMind, and Microsoft embracing MCP as a new industry standard[1][2]. However, organizations today face a fragmented landscape of one-off MCP integrations for each platform. There is no universal solution, and integrating multiple systems remains complex – integration challenges are cited as a key barrier to scaling AI solutions (around one-third of organizations)[3]. Security and data privacy are likewise top concerns when connecting AI to development infrastructure (with a majority of developers listing it as a primary worry)[4].
+The Model Context Protocol has rapidly gained traction as an open standard for connecting AI agents with external tools and data. By early 2025, developers had created over 1,000+ MCP servers for various services, with major players like OpenAI, Anthropic (Claude), Google DeepMind, and Microsoft embracing MCP as a new industry standard. However, organizations today face a fragmented landscape of one-off MCP integrations for each platform. There is no universal solution, and integrating multiple systems remains complex – integration challenges are cited as a key barrier to scaling AI solutions (around one-third of organizations). Security and data privacy are likewise top concerns when connecting AI to development infrastructure (with a majority of developers listing it as a primary worry).
 
 Project Nexus is built to address these gaps. Instead of running separate MCP servers for GitLab, GitHub, Azure, etc., Project Nexus offers a single unified server that can interface with all your major DevOps platforms. This unified approach reduces integration overhead and eliminates duplicated effort across multiple APIs. By standardizing how AI agents access code repositories, issue trackers, and CI/CD tools, Project Nexus improves security and consistency (one controlled gateway) and simplifies configuration for end users. In short, Project Nexus aims to be the “universal adapter” for AI-driven DevOps workflows – connecting your AI copilot to everything it needs with minimal setup.
 
@@ -218,7 +218,7 @@ See the [Roadmap](./ROADMAP.md) for upcoming features and plans.
 See the [Contributing Guide](./CONTRIBUTING.md) for how to get involved.
 
 ## License
-Project Nexus is open-source software, released under the MIT License[5]. See the LICENSE file for details. By using this project, you agree that it comes with no warranty – but we hope it will be useful to your workflows!
+Project Nexus is open-source software, released under the MIT License. See the LICENSE file for details. By using this project, you agree that it comes with no warranty – but we hope it will be useful to your workflows!
 
 ---
 

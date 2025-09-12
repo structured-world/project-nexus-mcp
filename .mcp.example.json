@@ -1,0 +1,36 @@
+{
+  "projects": {
+    "": "github:myorg/main-project",
+    "frontend/": "gitlab:mygroup/frontend",
+    "backend/": "azure:MyOrg/BackendProject"
+  },
+  "providers": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@github/github-mcp-server"],
+      "enabled": true,
+      "autoUpdate": true
+    },
+    {
+      "id": "gitlab",
+      "name": "GitLab",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@polaz/gitlab-mcp"],
+      "enabled": true,
+      "autoUpdate": true
+    },
+    {
+      "id": "azure",
+      "name": "Azure DevOps",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure/azure-mcp"],
+      "enabled": true,
+      "autoUpdate": true
+    }
+  ]
+}

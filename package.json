@@ -1,0 +1,49 @@
+{
+  "name": "project-nexus-mcp",
+  "description": "SW: Project Nexus MCP",
+  "packageManager": "yarn@4.9.4",
+  "author": "Dmitry Prudnikov <mail@polaz.com>",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix;tsc --noEmit",
+    "format": "prettier --write \"**/*.{js,ts,vue,scss,html,md,json}\" --ignore-path .gitignore",
+    "start": "node --no-warnings -r source-map-support/register --experimental-specifier-resolution=node dist/main.js",
+    "build": "tsc",
+    "start:dev": "tsx --watch src/main.ts",
+    "start:dev:stdio": "tsx --env-file=.env.test --watch src/main.ts stdio",
+    "start:debug": "DEBUG=1 yarn build && yarn start stdio",
+    "setup:env": "cp .env.example .env && echo 'Created .env file from .env.example - please edit with your real tokens'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.0",
+    "citty": "^0.1.6",
+    "express": "^5.1.0",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "eslint": "^9.35.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "bin": {
+    "nexus-mcp": "./dist/main.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

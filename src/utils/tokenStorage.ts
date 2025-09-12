@@ -32,17 +32,13 @@ export class TokenStorage {
     };
 
     try {
-      await fs.writeFile(
-        this.tokenFilePath, 
-        JSON.stringify(tokensWithTimestamp, null, 2), 
-        'utf-8'
-      );
-      
+      await fs.writeFile(this.tokenFilePath, JSON.stringify(tokensWithTimestamp, null, 2), 'utf-8');
+
       // Set restrictive permissions (readable only by owner)
       await fs.chmod(this.tokenFilePath, 0o600);
     } catch (error) {
       process.stderr.write(
-        `Warning: Could not save tokens to ${this.tokenFilePath}: ${error instanceof Error ? error.message : String(error)}\n`
+        `Warning: Could not save tokens to ${this.tokenFilePath}: ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
   }
@@ -66,7 +62,7 @@ export class TokenStorage {
     }
   }
 
-  async getTokensFilePath(): Promise<string> {
+  getTokensFilePath(): string {
     return this.tokenFilePath;
   }
 }

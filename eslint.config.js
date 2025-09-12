@@ -7,6 +7,7 @@ export default [
   js.configs.recommended,
   {
     files: ['**/*.ts'],
+    ignores: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -23,6 +24,7 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         clearTimeout: 'readonly',
+        fetch: 'readonly',
       },
     },
     plugins: {
@@ -55,6 +57,55 @@ export default [
       '@typescript-eslint/prefer-as-const': 'error',
       // Правила для строгого контроля типов аргументов функций
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-extraneous-class': 'off'
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        project: './tsconfig.json',
+        sourceType: 'module',
+      },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        NodeJS: 'readonly',
+        URL: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        clearTimeout: 'readonly',
+        fetch: 'readonly',
+        // Jest globals
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettierPlugin,
+    },
+    rules: {
+      ...tseslint.configs['recommended'].rules,
+      'prettier/prettier': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // Relax some rules for tests
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
     },
   },
 ];

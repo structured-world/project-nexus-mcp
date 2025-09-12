@@ -18,49 +18,55 @@ export function classifyError(error: unknown): ErrorClassification {
   const lowerMessage = errorMessage.toLowerCase();
 
   // Authentication/Authorization errors - do not reconnect
-  if (lowerMessage.includes('unauthorized') || 
-      lowerMessage.includes('401') ||
-      lowerMessage.includes('forbidden') ||
-      lowerMessage.includes('403') ||
-      lowerMessage.includes('invalid token') ||
-      lowerMessage.includes('authentication failed') ||
-      lowerMessage.includes('access denied') ||
-      lowerMessage.includes('bad credentials') ||
-      lowerMessage.includes('token expired')) {
+  if (
+    lowerMessage.includes('unauthorized') ||
+    lowerMessage.includes('401') ||
+    lowerMessage.includes('forbidden') ||
+    lowerMessage.includes('403') ||
+    lowerMessage.includes('invalid token') ||
+    lowerMessage.includes('authentication failed') ||
+    lowerMessage.includes('access denied') ||
+    lowerMessage.includes('bad credentials') ||
+    lowerMessage.includes('token expired')
+  ) {
     return {
       type: 'auth',
       shouldReconnect: false,
-      message: `Authentication failed: ${errorMessage}`
+      message: `Authentication failed: ${errorMessage}`,
     };
   }
 
   // Network/Connection errors - can reconnect
-  if (lowerMessage.includes('connection') ||
-      lowerMessage.includes('timeout') ||
-      lowerMessage.includes('network') ||
-      lowerMessage.includes('econnrefused') ||
-      lowerMessage.includes('enotfound') ||
-      lowerMessage.includes('socket') ||
-      lowerMessage.includes('dns') ||
-      lowerMessage.includes('502') ||
-      lowerMessage.includes('503') ||
-      lowerMessage.includes('504')) {
+  if (
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('econnrefused') ||
+    lowerMessage.includes('enotfound') ||
+    lowerMessage.includes('socket') ||
+    lowerMessage.includes('dns') ||
+    lowerMessage.includes('502') ||
+    lowerMessage.includes('503') ||
+    lowerMessage.includes('504')
+  ) {
     return {
       type: 'network',
       shouldReconnect: true,
-      message: `Network error: ${errorMessage}`
+      message: `Network error: ${errorMessage}`,
     };
   }
 
   // Configuration errors - do not reconnect
-  if (lowerMessage.includes('not found') && lowerMessage.includes('404') ||
-      lowerMessage.includes('invalid configuration') ||
-      lowerMessage.includes('missing parameter') ||
-      lowerMessage.includes('organization') && lowerMessage.includes('not found')) {
+  if (
+    (lowerMessage.includes('not found') && lowerMessage.includes('404')) ||
+    lowerMessage.includes('invalid configuration') ||
+    lowerMessage.includes('missing parameter') ||
+    (lowerMessage.includes('organization') && lowerMessage.includes('not found'))
+  ) {
     return {
       type: 'config',
       shouldReconnect: false,
-      message: `Configuration error: ${errorMessage}`
+      message: `Configuration error: ${errorMessage}`,
     };
   }
 
@@ -68,7 +74,7 @@ export function classifyError(error: unknown): ErrorClassification {
   return {
     type: 'unknown',
     shouldReconnect: true,
-    message: `Unknown error: ${errorMessage}`
+    message: `Unknown error: ${errorMessage}`,
   };
 }
 
@@ -79,7 +85,7 @@ export function shouldAttemptReconnection(
   reconnectAttempts: number = 0,
   lastReconnectTime?: Date,
   maxAttempts: number = 3,
-  cooldownMs: number = 30000 // 30 seconds
+  cooldownMs: number = 30000, // 30 seconds
 ): boolean {
   // Too many attempts
   if (reconnectAttempts >= maxAttempts) {

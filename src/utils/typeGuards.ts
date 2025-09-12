@@ -71,3 +71,74 @@ export function isLabelLike(
     ('title' in obj && typeof obj.title === 'string')
   );
 }
+
+// Type guards for adapter APIs
+export function isGitLabIssue(value: unknown): value is {
+  id: number;
+  iid: number;
+  title: string;
+  description?: string;
+  state: string;
+  assignees?: unknown[];
+  labels?: unknown[];
+} {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    'id' in obj &&
+    typeof obj.id === 'number' &&
+    'iid' in obj &&
+    typeof obj.iid === 'number' &&
+    'title' in obj &&
+    typeof obj.title === 'string'
+  );
+}
+
+export function isGitLabEpic(value: unknown): value is {
+  id: number;
+  title: string;
+  description?: string;
+  state: string;
+} {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    'id' in obj && typeof obj.id === 'number' && 'title' in obj && typeof obj.title === 'string'
+  );
+}
+
+export function isGitHubIssue(value: unknown): value is {
+  id: number;
+  number: number;
+  title: string;
+  body?: string;
+  state: string;
+  assignees?: unknown[];
+  labels?: unknown[];
+} {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    'id' in obj &&
+    typeof obj.id === 'number' &&
+    'number' in obj &&
+    typeof obj.number === 'number' &&
+    'title' in obj &&
+    typeof obj.title === 'string'
+  );
+}
+
+export function isAzureWorkItem(value: unknown): value is {
+  id: number;
+  fields: Record<string, unknown>;
+} {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    'id' in obj && typeof obj.id === 'number' && 'fields' in obj && typeof obj.fields === 'object'
+  );
+}
+
+export function isAPIResponse(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}

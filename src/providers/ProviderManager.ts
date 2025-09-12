@@ -65,26 +65,26 @@ export class ProviderManager extends EventEmitter {
       this.emit('provider:connected', instance);
     } catch (error) {
       const classification = classifyError(error);
-      
+
       instance.status = classification.type === 'auth' ? 'auth_failed' : 'error';
       instance.error = classification.message;
       instance.errorType = classification.type;
       instance.shouldReconnect = classification.shouldReconnect;
       instance.lastUpdated = new Date();
-      
+
       this.providers.set(config.id, instance);
-      
+
       if (classification.type === 'auth') {
         this.emit('provider:auth_failed', instance);
       } else {
         this.emit('provider:error', { provider: instance, error });
-        
+
         // Schedule reconnection for non-auth errors if appropriate
         if (classification.shouldReconnect) {
           this.scheduleReconnection(instance);
         }
       }
-      
+
       process.stderr.write(
         `Failed to initialize provider ${config.id}: ${classification.message}\n`,
       );
@@ -464,9 +464,11 @@ export class ProviderManager extends EventEmitter {
     const { id } = instance;
     const attempts = instance.reconnectAttempts ?? 0;
     const lastReconnectTime = instance.lastReconnectTime;
-    
+
     if (!shouldAttemptReconnection(attempts, lastReconnectTime)) {
-      process.stderr.write(`Skipping reconnection for ${id}: too many attempts or cooldown period not met\n`);
+      process.stderr.write(
+        `Skipping reconnection for ${id}: too many attempts or cooldown period not met\n`,
+      );
       return;
     }
 
@@ -479,28 +481,33 @@ export class ProviderManager extends EventEmitter {
     // Calculate delay: exponential backoff starting at 5 seconds
     const baseDelay = 5000; // 5 seconds
     const delay = baseDelay * Math.pow(2, attempts);
-    
-    process.stderr.write(`Scheduling reconnection for ${id} in ${delay}ms (attempt ${attempts + 1})\n`);
-    
-    const timer = setTimeout(async () => {
-      this.reconnectionTimers.delete(id);
-      
-      try {
-        process.stderr.write(`Attempting reconnection for ${id}...\n`);
-        
-        // Update reconnection tracking
-        instance.reconnectAttempts = (instance.reconnectAttempts ?? 0) + 1;
-        instance.lastReconnectTime = new Date();
-        instance.status = 'starting';
-        
-        // Attempt to reinitialize
-        await this.initializeProvider(instance.config);
-        
-      } catch (error) {
-        process.stderr.write(`Reconnection failed for ${id}: ${error instanceof Error ? error.message : String(error)}\n`);
-      }
+
+    process.stderr.write(
+      `Scheduling reconnection for ${id} in ${delay}ms (attempt ${attempts + 1})\n`,
+    );
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        this.reconnectionTimers.delete(id);
+
+        try {
+          process.stderr.write(`Attempting reconnection for ${id}...\n`);
+
+          // Update reconnection tracking
+          instance.reconnectAttempts = (instance.reconnectAttempts ?? 0) + 1;
+          instance.lastReconnectTime = new Date();
+          instance.status = 'starting';
+
+          // Attempt to reinitialize
+          await this.initializeProvider(instance.config);
+        } catch (error) {
+          process.stderr.write(
+            `Reconnection failed for ${id}: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
+      })();
     }, delay);
-    
+
     this.reconnectionTimers.set(id, timer);
   }
 
@@ -513,11 +520,13 @@ export class ProviderManager extends EventEmitter {
       return;
     }
 
-    const classification = error ? classifyError(error) : {
-      type: 'network' as const,
-      shouldReconnect: true,
-      message: 'Provider process terminated unexpectedly'
-    };
+    const classification = error
+      ? classifyError(error)
+      : {
+          type: 'network' as const,
+          shouldReconnect: true,
+          message: 'Provider process terminated unexpectedly',
+        };
 
     provider.status = classification.type === 'auth' ? 'auth_failed' : 'error';
     provider.error = classification.message;
@@ -526,12 +535,14 @@ export class ProviderManager extends EventEmitter {
     provider.lastUpdated = new Date();
 
     if (classification.type === 'auth') {
-      process.stderr.write(`Provider ${providerId} failed with authentication error, will not reconnect\n`);
+      process.stderr.write(
+        `Provider ${providerId} failed with authentication error, will not reconnect\n`,
+      );
       this.emit('provider:auth_failed', provider);
     } else {
       process.stderr.write(`Provider ${providerId} failed: ${classification.message}\n`);
       this.emit('provider:error', { provider, error: error ?? new Error(classification.message) });
-      
+
       if (classification.shouldReconnect) {
         this.scheduleReconnection(provider);
       }
@@ -549,7 +560,11 @@ export class ProviderManager extends EventEmitter {
     // Listen for transport errors/disconnections if available
     // Note: Not all MCP client transports expose these events
     try {
-      const transport = (instance.client as any)._transport;
+      const transport = (
+        instance.client as unknown as {
+          _transport?: { onclose?: () => void; onerror?: (error: unknown) => void };
+        }
+      )._transport;
       if (transport && typeof transport.onclose === 'function') {
         transport.onclose = () => {
           if (instance.status === 'connected') {
@@ -560,12 +575,14 @@ export class ProviderManager extends EventEmitter {
       }
 
       if (transport && typeof transport.onerror === 'function') {
-        transport.onerror = (error: Error) => {
-          process.stderr.write(`Provider ${instance.id} error: ${error.message}\n`);
-          this.handleProviderFailure(instance.id, error);
+        transport.onerror = (error: unknown) => {
+          process.stderr.write(
+            `Provider ${instance.id} error: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+          this.handleProviderFailure(instance.id, error instanceof Error ? error : undefined);
         };
       }
-    } catch (error) {
+    } catch {
       // Transport monitoring not available, that's okay
       process.stderr.write(`Transport monitoring not available for ${instance.id}\n`);
     }

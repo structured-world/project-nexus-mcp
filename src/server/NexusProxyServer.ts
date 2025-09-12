@@ -121,7 +121,9 @@ export class NexusProxyServer {
 
     this.providerManager.on('provider:auth_failed', (provider: { id: string; error?: string }) => {
       const missingTokensInfo = this.getMissingTokensInfo(provider.id);
-      process.stderr.write(`🔑 Provider authentication failed (${provider.id}): ${provider.error || 'Missing authentication tokens'}\n`);
+      process.stderr.write(
+        `🔑 Provider authentication failed (${provider.id}): ${provider.error ?? 'Missing authentication tokens'}\n`,
+      );
       if (missingTokensInfo) {
         process.stderr.write(`💡 ${missingTokensInfo}\n`);
       }
@@ -147,7 +149,7 @@ export class NexusProxyServer {
           return 'Set GITLAB_TOKEN environment variable with your GitLab personal access token';
         }
         break;
-      case 'azure':
+      case 'azure': {
         const missingAzure: string[] = [];
         if (!process.env.AZURE_DEVOPS_PAT) {
           missingAzure.push('AZURE_DEVOPS_PAT');
@@ -159,6 +161,7 @@ export class NexusProxyServer {
           return `Set environment variables: ${missingAzure.join(', ')}`;
         }
         break;
+      }
     }
     return null;
   }
@@ -168,7 +171,7 @@ export class NexusProxyServer {
    */
   private getAllMissingTokensInfo(): Record<string, string> {
     const missing: Record<string, string> = {};
-    
+
     const providers = ['github', 'gitlab', 'azure'];
     for (const providerId of providers) {
       const info = this.getMissingTokensInfo(providerId);
@@ -176,7 +179,7 @@ export class NexusProxyServer {
         missing[providerId] = info;
       }
     }
-    
+
     return missing;
   }
 
@@ -272,16 +275,16 @@ export class NexusProxyServer {
           error: p.error,
           errorType: p.errorType,
           shouldReconnect: p.shouldReconnect,
-          reconnectAttempts: p.reconnectAttempts || 0,
+          reconnectAttempts: p.reconnectAttempts ?? 0,
           lastUpdated: p.lastUpdated?.toISOString(),
         }));
-        
+
         // Add helpful information about missing tokens
         const statusWithHelp = {
           providers: status,
           missingTokens: this.getAllMissingTokensInfo(),
         };
-        
+
         return {
           content: [
             {
@@ -388,7 +391,16 @@ export class NexusProxyServer {
         name: 'GitLab',
         type: 'stdio' as const,
         command: 'uv',
-        args: ['run', '--python', '3.13', '--with', 'git+https://github.com/polaz/gitlab-mcp.git', 'python', '-m', 'gitlab_mcp'],
+        args: [
+          'run',
+          '--python',
+          '3.13',
+          '--with',
+          'git+https://github.com/polaz/gitlab-mcp.git',
+          'python',
+          '-m',
+          'gitlab_mcp',
+        ],
         env: {
           GITLAB_PERSONAL_ACCESS_TOKEN: process.env.GITLAB_TOKEN,
           GITLAB_API_URL: process.env.GITLAB_URL ?? 'https://gitlab.com/api/v4',
@@ -455,7 +467,16 @@ export class NexusProxyServer {
         name: 'GitLab',
         type: 'stdio' as const,
         command: 'uv',
-        args: ['run', '--python', '3.13', '--with', 'git+https://github.com/polaz/gitlab-mcp.git', 'python', '-m', 'gitlab_mcp'],
+        args: [
+          'run',
+          '--python',
+          '3.13',
+          '--with',
+          'git+https://github.com/polaz/gitlab-mcp.git',
+          'python',
+          '-m',
+          'gitlab_mcp',
+        ],
         env: {
           GITLAB_PERSONAL_ACCESS_TOKEN: process.env.GITLAB_TOKEN,
           GITLAB_API_URL: process.env.GITLAB_URL ?? 'https://gitlab.com/api/v4',
@@ -494,7 +515,9 @@ export class NexusProxyServer {
     // Initialize all providers asynchronously without blocking
     const initPromises = this.config.providers.map(async (providerConfig) => {
       if (providerConfig.enabled) {
-        process.stderr.write(`Initializing provider: ${providerConfig.name} (${providerConfig.id})...\n`);
+        process.stderr.write(
+          `Initializing provider: ${providerConfig.name} (${providerConfig.id})...\n`,
+        );
         try {
           await this.providerManager.initializeProvider(providerConfig);
           process.stderr.write(`✓ ${providerConfig.name} initialized successfully\n`);
@@ -512,8 +535,8 @@ export class NexusProxyServer {
     await Promise.allSettled(initPromises);
 
     // Print final status
-    await this.printProviderStatus();
-    
+    this.printProviderStatus();
+
     this.providerManager.startAutoUpdate(60000);
   }
 
@@ -566,11 +589,11 @@ export class NexusProxyServer {
     });
   }
 
-  private async printProviderStatus(): Promise<void> {
+  private printProviderStatus(): void {
     const providers = this.providerManager.getAllProviders();
-    
+
     process.stderr.write(`\\n=== Provider Status Summary ===\\n`);
-    
+
     if (providers.length === 0) {
       process.stderr.write(`⚠️  No providers configured. Set environment variables:\\n`);
       process.stderr.write(`   GITHUB_TOKEN - for GitHub integration\\n`);
@@ -581,38 +604,46 @@ export class NexusProxyServer {
 
     let connectedCount = 0;
     for (const provider of providers) {
-      const status = provider.status === 'connected' ? '🟢' : 
-                    provider.status === 'error' ? '🔴' : '🟡';
-      
-      process.stderr.write(`${status} ${provider.config.name} (${provider.id}): ${provider.status}\\n`);
-      
+      const status =
+        provider.status === 'connected' ? '🟢' : provider.status === 'error' ? '🔴' : '🟡';
+
+      process.stderr.write(
+        `${status} ${provider.config.name} (${provider.id}): ${provider.status}\\n`,
+      );
+
       if (provider.status === 'connected') {
         connectedCount++;
-        process.stderr.write(`   Tools: ${provider.tools.size}, Resources: ${provider.resources.size}, Prompts: ${provider.prompts.size}\\n`);
+        process.stderr.write(
+          `   Tools: ${provider.tools.size}, Resources: ${provider.resources.size}, Prompts: ${provider.prompts.size}\\n`,
+        );
       } else if (provider.status === 'error' && provider.error) {
         process.stderr.write(`   Error: ${provider.error}\\n`);
       }
     }
-    
-    process.stderr.write(`\\n✨ ${connectedCount}/${providers.length} providers connected successfully\\n`);
-    
+
+    process.stderr.write(
+      `\\n✨ ${connectedCount}/${providers.length} providers connected successfully\\n`,
+    );
+
     if (connectedCount > 0) {
       const totalTools = this.providerManager.getAllTools().length;
       const unifiedTools = this.workItemsManager.createUnifiedTools().length;
       const additionalTools = this.createAdditionalTools().length;
-      
-      process.stderr.write(`📋 Available tools: ${totalTools + unifiedTools + additionalTools} total\\n`);
+
+      process.stderr.write(
+        `📋 Available tools: ${totalTools + unifiedTools + additionalTools} total\\n`,
+      );
       process.stderr.write(`   - Provider tools: ${totalTools}\\n`);
       process.stderr.write(`   - Unified work item tools: ${unifiedTools}\\n`);
       process.stderr.write(`   - Management tools: ${additionalTools}\\n`);
     }
-    
+
     process.stderr.write(`=====================================\\n`);
   }
 
   async shutdown(): Promise<void> {
     process.stderr.write(`\\n🛑 Shutting down Project Nexus MCP Server...\\n`);
-    
+
     await this.providerManager.shutdown();
 
     if (this.httpServer) {
@@ -620,7 +651,7 @@ export class NexusProxyServer {
     }
 
     await this.server.close();
-    
+
     process.stderr.write(`✅ Server shutdown complete\\n`);
   }
 }

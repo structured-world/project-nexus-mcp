@@ -1,12 +1,12 @@
 import { ProviderManager } from '../providers/ProviderManager.js';
-import { WorkItem, ProviderAPIResponse } from '../types/index.js';
+import { WorkItem, ProviderAPIResponse, Priority } from '../types/index.js';
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { hasTextContent, isProviderAPIResponse, isLabelLike } from '../utils/typeGuards.js';
 
 export class WorkItemsManager {
-  constructor(private providerManager: ProviderManager) {}
+  constructor(protected providerManager: ProviderManager) {}
 
-  private detectProviderFromProject(project: string): string {
+  protected detectProviderFromProject(project: string): string {
     const [provider] = project.split(':');
     return provider;
   }
@@ -184,15 +184,15 @@ export class WorkItemsManager {
 
     const newItem = await this.createWorkItem(targetProject, {
       title: sourceWorkItem.title,
-      description: `Transferred from ${sourceWorkItem.provider}:${sourceWorkItem.id}\n\n${sourceWorkItem.description ?? ''}`,
+      description: `Transferred from ${sourceWorkItem.provider}:${sourceWorkItem.id}\n\n${sourceWorkItem.description}`,
       type: sourceWorkItem.type,
-      labels: [...(sourceWorkItem.labels ?? []), 'transferred'],
+      labels: [...sourceWorkItem.labels, 'transferred'],
       priority: sourceWorkItem.priority,
     });
 
     await this.updateWorkItem(workItemId, {
-      status: 'closed',
-      description: `${sourceWorkItem.description ?? ''}\n\n---\nTransferred to ${targetProject}:${newItem.id}`,
+      state: 'closed',
+      description: `${sourceWorkItem.description}\n\n---\nTransferred to ${targetProject}:${newItem.id}`,
     });
 
     return newItem;
@@ -244,20 +244,23 @@ export class WorkItemsManager {
   }
 
   private normalizeWorkItem(item: ProviderAPIResponse, provider: string): WorkItem {
+    const assignees = this.normalizeAssignees(item);
+    const author = this.normalizeAuthor(item);
+
     const normalized: WorkItem = {
       id: `${provider}:${item.id ?? item.number ?? item.iid}`,
-      provider,
+      provider: provider as 'gitlab' | 'github' | 'azure',
       type: this.normalizeType(item.type ?? item.issue_type ?? 'issue'),
       title: item.title ?? item.name ?? item.summary ?? '',
       description: item.description ?? item.body ?? item.content ?? '',
-      status: this.normalizeStatus(item.state ?? item.status ?? 'open'),
-      assignee: this.normalizeAssignee(item),
+      state: this.normalizeState(item.state ?? item.status ?? 'open'),
+      author: author,
+      assignees: assignees,
       labels: this.normalizeLabels(item),
-      milestone: this.normalizeMilestone(item.milestone),
-      priority: item.priority ?? 'normal',
-      createdAt: item.created_at ? new Date(item.created_at) : undefined,
-      updatedAt: item.updated_at ? new Date(item.updated_at) : undefined,
-      originalData: item,
+      priority: (item.priority as Priority | undefined) ?? 'medium',
+      createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+      updatedAt: item.updated_at ? new Date(item.updated_at) : new Date(),
+      providerFields: this.createProviderFields(item, provider),
     };
 
     return normalized;
@@ -287,12 +290,12 @@ export class WorkItemsManager {
       denormalized.description = item.description;
       denormalized.body = item.description;
     }
-    if (item.status) {
-      denormalized.state = this.denormalizeStatus(item.status, provider);
+    if (item.state) {
+      denormalized.state = this.denormalizeState(item.state, provider);
     }
-    if (item.assignee) {
-      denormalized.assignee = item.assignee;
-      denormalized.assignees = [item.assignee];
+    if (item.assignees && item.assignees.length > 0) {
+      denormalized.assignee = item.assignees[0].username;
+      denormalized.assignees = item.assignees.map((a) => a.username);
     }
     if (item.labels) {
       denormalized.labels = item.labels;
@@ -321,65 +324,121 @@ export class WorkItemsManager {
     return typeMap[type.toLowerCase()] ?? 'issue';
   }
 
-  private normalizeStatus(status: string): string {
-    const statusMap: Record<string, string> = {
+  private normalizeState(status: string): 'open' | 'closed' {
+    const statusMap: Record<string, 'open' | 'closed'> = {
       open: 'open',
       opened: 'open',
       closed: 'closed',
       resolved: 'closed',
       done: 'closed',
-      'in progress': 'in_progress',
-      in_progress: 'in_progress',
-      active: 'in_progress',
       todo: 'open',
       new: 'open',
     };
 
-    return statusMap[status.toLowerCase()] || status;
+    return statusMap[status.toLowerCase()] ?? 'open';
   }
 
-  private denormalizeStatus(status: string, provider: string): string {
+  private denormalizeState(state: 'open' | 'closed', provider: string): string {
     if (provider === 'github') {
-      return status === 'closed' ? 'closed' : 'open';
+      return state === 'closed' ? 'closed' : 'open';
     } else if (provider === 'gitlab') {
-      return status === 'closed' ? 'closed' : 'opened';
+      return state === 'closed' ? 'closed' : 'opened';
     } else if (provider === 'azure') {
-      const azureStatusMap: Record<string, string> = {
+      const azureStateMap: Record<string, string> = {
         open: 'New',
-        in_progress: 'Active',
         closed: 'Closed',
       };
-      return azureStatusMap[status] || status;
+      return azureStateMap[state] || state;
     }
 
-    return status;
+    return state;
   }
 
-  private normalizeAssignee(item: ProviderAPIResponse): string | undefined {
+  private normalizeAssignees(item: ProviderAPIResponse): import('../types/index.js').User[] {
+    const assignees: import('../types/index.js').User[] = [];
+
     if (item.assignee) {
-      return typeof item.assignee === 'string'
-        ? item.assignee
-        : (item.assignee.username ?? item.assignee.login);
+      if (typeof item.assignee === 'string') {
+        assignees.push(this.createUser(item.assignee, item.assignee));
+      } else {
+        assignees.push(
+          this.createUser(
+            item.assignee.username ?? item.assignee.login ?? 'unknown',
+            item.assignee.name ?? item.assignee.username ?? item.assignee.login ?? 'unknown',
+          ),
+        );
+      }
     }
-    if (item.assignees && Array.isArray(item.assignees) && item.assignees.length > 0) {
-      const assignee = item.assignees[0];
-      return typeof assignee === 'string' ? assignee : (assignee.username ?? assignee.login);
+
+    if (item.assignees && Array.isArray(item.assignees)) {
+      for (const assignee of item.assignees) {
+        if (typeof assignee === 'string') {
+          assignees.push(this.createUser(assignee, assignee));
+        } else {
+          assignees.push(
+            this.createUser(
+              assignee.username ?? assignee.login ?? 'unknown',
+              assignee.name ?? assignee.username ?? assignee.login ?? 'unknown',
+            ),
+          );
+        }
+      }
     }
-    if (item.assigned_to) {
-      return typeof item.assigned_to === 'string' ? item.assigned_to : item.assigned_to.name;
+
+    if (item.assigned_to && assignees.length === 0) {
+      if (typeof item.assigned_to === 'string') {
+        assignees.push(this.createUser(item.assigned_to, item.assigned_to));
+      } else {
+        assignees.push(
+          this.createUser(item.assigned_to.name ?? 'unknown', item.assigned_to.name ?? 'unknown'),
+        );
+      }
     }
-    return undefined;
+
+    return assignees;
   }
 
-  private normalizeMilestone(milestone: ProviderAPIResponse['milestone']): string {
-    if (typeof milestone === 'string') {
-      return milestone;
-    }
-    if (milestone && typeof milestone === 'object' && 'title' in milestone) {
-      return String(milestone.title);
-    }
-    return '';
+  private normalizeAuthor(_item: ProviderAPIResponse): import('../types/index.js').User {
+    // Default author - in real implementation this would come from the API response
+    return this.createUser('unknown', 'Unknown User');
   }
+
+  private createUser(username: string, displayName: string): import('../types/index.js').User {
+    return {
+      id: username,
+      username,
+      displayName,
+      provider: 'gitlab' as const, // Will be set properly in real implementation
+    };
+  }
+
+  private createProviderFields(
+    item: ProviderAPIResponse,
+    provider: string,
+  ): import('../types/index.js').ProviderSpecificFields {
+    if (provider === 'gitlab') {
+      return {
+        iid: item.iid ?? 0,
+        projectId: 0, // Would be extracted from API response
+        weight: 'weight' in item && typeof item.weight === 'number' ? item.weight : undefined,
+        confidential: false,
+      } as import('../types/index.js').GitLabSpecificFields;
+    } else if (provider === 'github') {
+      return {
+        number: item.number ?? 0,
+        repository: 'unknown/unknown',
+        stateReason: undefined,
+      } as import('../types/index.js').GitHubSpecificFields;
+    } else {
+      return {
+        workItemId: typeof item.id === 'number' ? item.id : 0,
+        workItemType: item.type ?? 'Issue',
+        state: item.state ?? item.status ?? 'New',
+      } as import('../types/index.js').AzureSpecificFields;
+    }
+  }
+
+  // Removed unused normalizeMilestone method
 
   private normalizeLabels(item: ProviderAPIResponse): string[] {
     if (item.labels && Array.isArray(item.labels)) {

@@ -806,14 +806,16 @@ export class NexusProxyServer {
     }
 
     // Start cache warming in the background (don't await)
-    setTimeout(async () => {
-      try {
-        await this.workItemsManager.warmupCaches();
-      } catch (error) {
-        logger.error(
-          `[cache] Cache warmup failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+    setTimeout(() => {
+      void (async () => {
+        try {
+          await this.workItemsManager.warmupCaches();
+        } catch (error) {
+          logger.error(
+            `[cache] Cache warmup failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      })();
     }, 2000); // Wait 2 seconds after server startup to avoid interfering with initialization
   }
 
@@ -1105,14 +1107,6 @@ export class NexusProxyServer {
           unifiedToolPatterns.set('get.*commit.*diff', 'nexus_get_commit_diff');
           unifiedToolPatterns.set('get.*diff', 'nexus_get_commit_diff');
           unifiedToolPatterns.set('compare.*commit', 'nexus_get_commit_diff');
-          break;
-        case 'nexus_update_work_item':
-          unifiedToolPatterns.set('update.*work.*item', 'nexus_update_work_item');
-          unifiedToolPatterns.set('update.*issue', 'nexus_update_work_item');
-          break;
-        case 'nexus_transfer_work_item':
-          unifiedToolPatterns.set('transfer.*work.*item', 'nexus_transfer_work_item');
-          unifiedToolPatterns.set('move.*issue', 'nexus_transfer_work_item');
           break;
       }
     }

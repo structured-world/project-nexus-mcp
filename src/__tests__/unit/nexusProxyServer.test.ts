@@ -152,7 +152,9 @@ describe('NexusProxyServer', () => {
         );
 
         // Should NOT contain provider-specific tools (they are hidden)
-        const hasProviderTool = result.tools.some((tool: { name: string }) => tool.name === 'provider_tool');
+        const hasProviderTool = result.tools.some(
+          (tool: { name: string }) => tool.name === 'provider_tool',
+        );
         expect(hasProviderTool).toBe(false);
       });
     });

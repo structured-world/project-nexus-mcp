@@ -629,7 +629,7 @@ export class WorkItemsManager {
             }
           }
           break; // Found a working tool for this provider
-        } catch (error) {
+        } catch {
           // Continue to next tool
           continue;
         }
@@ -675,18 +675,18 @@ export class WorkItemsManager {
               return parsedMembers.map((member) => {
                 const mem = member as Record<string, unknown>;
                 return {
-                  userId: String(mem.id || mem.user_id || mem.username),
-                  username: String(mem.username || mem.login || mem.name),
-                  displayName: String(mem.name || mem.display_name || mem.username || mem.login),
+                  userId: String(mem.id ?? mem.user_id ?? mem.username),
+                  username: String(mem.username ?? mem.login ?? mem.name),
+                  displayName: String(mem.name ?? mem.display_name ?? mem.username ?? mem.login),
                   email: mem.email ? String(mem.email) : undefined,
-                  role: String(mem.role || mem.permission || mem.access_level || 'member'),
+                  role: String(mem.role ?? mem.permission ?? mem.access_level ?? 'member'),
                   accessLevel: typeof mem.access_level === 'number' ? mem.access_level : undefined,
                 } as UserRole;
               });
             }
           }
           break; // Found a working tool
-        } catch (error) {
+        } catch {
           // Continue to next tool
           continue;
         }
@@ -708,7 +708,9 @@ export class WorkItemsManager {
         const projects = await this.fetchProjectsFromProvider(provider);
         this.cacheManager.setProjects(provider, projects);
       } catch (error) {
-        process.stderr.write(`[cache] Failed to refresh projects for ${provider}: ${error}\n`);
+        process.stderr.write(
+          `[cache] Failed to refresh projects for ${provider}: ${String(error)}\n`,
+        );
       }
     } else if (type === 'users') {
       process.stderr.write(`[cache] Refreshing users cache for ${provider}...\n`);
@@ -716,7 +718,7 @@ export class WorkItemsManager {
         const users = await this.fetchUsersFromProvider(provider);
         this.cacheManager.setUsers(provider, users);
       } catch (error) {
-        process.stderr.write(`[cache] Failed to refresh users for ${provider}: ${error}\n`);
+        process.stderr.write(`[cache] Failed to refresh users for ${provider}: ${String(error)}\n`);
       }
     }
   }
@@ -757,11 +759,11 @@ export class WorkItemsManager {
                 if (typeof user === 'object' && user !== null) {
                   const usr = user as Record<string, unknown>;
                   users.push({
-                    userId: String(usr.id || usr.user_id || usr.username),
-                    username: String(usr.username || usr.login || usr.name),
-                    displayName: String(usr.name || usr.display_name || usr.username || usr.login),
+                    userId: String(usr.id ?? usr.user_id ?? usr.username),
+                    username: String(usr.username ?? usr.login ?? usr.name),
+                    displayName: String(usr.name ?? usr.display_name ?? usr.username ?? usr.login),
                     email: usr.email ? String(usr.email) : undefined,
-                    role: String(usr.role || usr.permission || usr.access_level || 'member'),
+                    role: String(usr.role ?? usr.permission ?? usr.access_level ?? 'member'),
                     accessLevel:
                       typeof usr.access_level === 'number' ? usr.access_level : undefined,
                   });
@@ -770,7 +772,7 @@ export class WorkItemsManager {
             }
           }
           break; // Found a working tool for this provider
-        } catch (error) {
+        } catch {
           // Continue to next tool
           continue;
         }
@@ -862,7 +864,7 @@ export class WorkItemsManager {
 
         process.stderr.write(`[cache] Warmup completed for ${provider.id}\n`);
       } catch (error) {
-        process.stderr.write(`[cache] Warmup failed for ${provider.id}: ${error}\n`);
+        process.stderr.write(`[cache] Warmup failed for ${provider.id}: ${String(error)}\n`);
       }
     });
 

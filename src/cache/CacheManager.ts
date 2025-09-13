@@ -82,7 +82,7 @@ export class CacheManager {
   getAllProjects(): ProjectCacheData[] {
     const allProjects: ProjectCacheData[] = [];
 
-    for (const [provider, entry] of this.projectsCache.entries()) {
+    for (const [provider, entry] of Array.from(this.projectsCache.entries())) {
       // Check if cache is still valid
       if (Date.now() - entry.timestamp <= entry.ttl) {
         allProjects.push(...entry.data);
@@ -166,7 +166,7 @@ export class CacheManager {
   getAllUsers(): UserRole[] {
     const allUsers: UserRole[] = [];
 
-    for (const [provider, entry] of this.usersCache.entries()) {
+    for (const [provider, entry] of Array.from(this.usersCache.entries())) {
       // Check if cache is still valid
       if (Date.now() - entry.timestamp <= entry.ttl) {
         allUsers.push(...Array.from(entry.data.users.values()));
@@ -282,7 +282,7 @@ export class CacheManager {
     this.usersCache.clear();
 
     // Clear all timers
-    for (const timer of this.refreshTimers.values()) {
+    for (const timer of Array.from(this.refreshTimers.values())) {
       clearTimeout(timer);
     }
     this.refreshTimers.clear();
@@ -294,7 +294,7 @@ export class CacheManager {
    * Graceful shutdown - clear all timers
    */
   shutdown(): void {
-    for (const timer of this.refreshTimers.values()) {
+    for (const timer of Array.from(this.refreshTimers.values())) {
       clearTimeout(timer);
     }
     this.refreshTimers.clear();

@@ -2,6 +2,7 @@
 
 import { NexusProxyServer } from './server/NexusProxyServer.js';
 import { defineCommand, runMain } from 'citty';
+import { logger } from './utils/logger.js';
 
 const stdio = defineCommand({
   meta: {
@@ -17,10 +18,15 @@ const stdio = defineCommand({
     },
   },
   async run() {
+    // Enable file logging for STDIO mode to keep stderr clean for MCP protocol
+    logger.setStdioMode(true);
+    logger.log(`Starting Project Nexus MCP Server in STDIO mode. Log file: ${logger.getLogFile()}`);
+
     const server = new NexusProxyServer();
 
     process.on('SIGINT', () => {
       void (async () => {
+        logger.log('Received SIGINT, shutting down gracefully');
         await server.shutdown();
         process.exit(0);
       })();
@@ -28,6 +34,7 @@ const stdio = defineCommand({
 
     process.on('SIGTERM', () => {
       void (async () => {
+        logger.log('Received SIGTERM, shutting down gracefully');
         await server.shutdown();
         process.exit(0);
       })();
@@ -36,6 +43,7 @@ const stdio = defineCommand({
     try {
       await server.runStdio();
     } catch (error) {
+      logger.error('Failed to start server:', error);
       process.stderr.write(
         `Failed to start server: ${error instanceof Error ? error.message : String(error)}\n`,
       );

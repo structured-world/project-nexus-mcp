@@ -522,7 +522,7 @@ export class ProviderManager extends EventEmitter {
       case 'gitlab':
         return Boolean(process.env.GITLAB_TOKEN);
       case 'azure':
-        return Boolean(process.env.AZURE_DEVOPS_PAT && process.env.AZURE_ORG);
+        return Boolean(process.env.AZURE_TOKEN && process.env.AZURE_ORG);
       default:
         // For unknown providers, assume tokens are not required
         return true;

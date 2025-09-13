@@ -40,7 +40,7 @@ async function runIntegrationTest() {
         type: 'stdio',
         command: 'npx',
         args: ['-y', '@azure-devops/mcp', 'test_organization'],
-        env: { AZURE_DEVOPS_PAT: 'test_token' },
+        env: { AZURE_TOKEN: 'test_token' },
         enabled: true,
       },
     ],
@@ -181,7 +181,7 @@ async function runIntegrationTest() {
     console.log('\n🔧 To enable additional providers, configure environment variables:');
     console.log('   export GITHUB_TOKEN=your_github_token');
     console.log('   export GITLAB_TOKEN=your_gitlab_token');
-    console.log('   export AZURE_DEVOPS_PAT=your_azure_pat');
+    console.log('   export AZURE_TOKEN=your_azure_pat');
     console.log('   export AZURE_ORG=your_azure_org');
   } catch (error) {
     console.error('❌ Integration test failed:', error);

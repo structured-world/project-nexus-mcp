@@ -210,7 +210,7 @@ describe('ProviderManager', () => {
         enabled: true,
       };
 
-      delete process.env.AZURE_DEVOPS_PAT;
+      delete process.env.AZURE_TOKEN;
       delete process.env.AZURE_ORG;
 
       const result = await providerManager.initializeProvider(azureConfig);

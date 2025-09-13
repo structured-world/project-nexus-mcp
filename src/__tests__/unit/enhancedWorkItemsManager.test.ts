@@ -315,7 +315,7 @@ describe('EnhancedWorkItemsManager', () => {
           provider: 'azure',
           status: 'missing-token',
           isValid: false,
-          reason: 'Missing AZURE_DEVOPS_PAT',
+          reason: 'Missing AZURE_TOKEN',
         });
 
       const status = enhancedManager.getConfigurationStatus();
@@ -323,7 +323,7 @@ describe('EnhancedWorkItemsManager', () => {
       expect(status.configured).toEqual(['github']);
       expect(status.missing).toEqual([
         { provider: 'gitlab', reason: 'Missing GITLAB_TOKEN' },
-        { provider: 'azure', reason: 'Missing AZURE_DEVOPS_PAT' },
+        { provider: 'azure', reason: 'Missing AZURE_TOKEN' },
       ]);
       expect(status.total).toBe(3);
     });
@@ -1070,7 +1070,7 @@ describe('EnhancedWorkItemsManager', () => {
     it('should get provider tokens from environment', () => {
       process.env.GITHUB_TOKEN = 'github-token';
       process.env.GITLAB_TOKEN = 'gitlab-token';
-      process.env.AZURE_DEVOPS_PAT = 'azure-token';
+      process.env.AZURE_TOKEN = 'azure-token';
 
       const manager = enhancedManager as any;
 

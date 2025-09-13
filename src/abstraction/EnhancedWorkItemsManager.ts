@@ -389,7 +389,7 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
       case 'gitlab':
         return process.env.GITLAB_TOKEN ?? 'test_token';
       case 'azure':
-        return process.env.AZURE_DEVOPS_PAT ?? 'test_token';
+        return process.env.AZURE_TOKEN ?? 'test_token';
       default:
         return 'test_token';
     }

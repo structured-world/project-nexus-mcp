@@ -59,7 +59,7 @@ We provide a Docker image for easy deployment. This is useful if you want to run
    docker run -d -p 4000:4000 \
      -e GITLAB_TOKEN=<your-gitlab-token> \
      -e GITHUB_TOKEN=<your-github-token> \
-     -e AZURE_DEVOPS_PAT=<your-azure-pat> \
+     -e AZURE_TOKEN=<your-azure-pat> \
      ghcr.io/structured-world/project-nexus-mcp:latest --http --port 4000
    ```
    This launches Project Nexus in HTTP mode listening on port 4000 (with SSE streaming enabled). The environment variables in the command above provide the necessary credentials (see Configuration below). The `--http` and `--port 4000` flags instruct Nexus to run as a server. Now multiple AI clients can connect to `http://<docker-host>:4000` as an MCP endpoint.

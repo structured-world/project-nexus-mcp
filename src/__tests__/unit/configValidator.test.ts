@@ -111,7 +111,7 @@ describe('Configuration Validator', () => {
 
     describe('Azure provider', () => {
       it('should pass validation with valid PAT, org, and project', () => {
-        process.env.AZURE_DEVOPS_PAT = 'valid_pat_token_here';
+        process.env.AZURE_TOKEN = 'valid_pat_token_here';
         process.env.AZURE_ORG = 'myorganization';
         process.env.AZURE_PROJECT = 'myproject';
 
@@ -125,7 +125,7 @@ describe('Configuration Validator', () => {
       });
 
       it('should fail validation with PAT and org but missing project', () => {
-        process.env.AZURE_DEVOPS_PAT = 'valid_pat_token_here';
+        process.env.AZURE_TOKEN = 'valid_pat_token_here';
         process.env.AZURE_ORG = 'myorganization';
         delete process.env.AZURE_PROJECT;
 
@@ -141,18 +141,18 @@ describe('Configuration Validator', () => {
       });
 
       it('should fail validation with missing PAT', () => {
-        delete process.env.AZURE_DEVOPS_PAT;
+        delete process.env.AZURE_TOKEN;
         process.env.AZURE_ORG = 'myorganization';
 
         const result = validateProviderConfig('azure');
 
         expect(result.status).toBe('missing-token');
         expect(result.isValid).toBe(false);
-        expect(result.reason).toContain('AZURE_DEVOPS_PAT');
+        expect(result.reason).toContain('AZURE_TOKEN');
       });
 
       it('should fail validation with missing organization', () => {
-        process.env.AZURE_DEVOPS_PAT = 'valid_pat_token_here';
+        process.env.AZURE_TOKEN = 'valid_pat_token_here';
         delete process.env.AZURE_ORG;
 
         const result = validateProviderConfig('azure');
@@ -180,7 +180,7 @@ describe('Configuration Validator', () => {
       process.env.GITHUB_TOKEN = 'ghp_valid_github_token';
       process.env.GITHUB_ORG = 'myorg';
       delete process.env.GITLAB_TOKEN;
-      delete process.env.AZURE_DEVOPS_PAT;
+      delete process.env.AZURE_TOKEN;
 
       const results = validateAllProviderConfigs();
 
@@ -193,7 +193,7 @@ describe('Configuration Validator', () => {
     it('should return empty results when no providers configured', () => {
       delete process.env.GITHUB_TOKEN;
       delete process.env.GITLAB_TOKEN;
-      delete process.env.AZURE_DEVOPS_PAT;
+      delete process.env.AZURE_TOKEN;
       delete process.env.AZURE_ORG;
 
       const results = validateAllProviderConfigs();
@@ -257,7 +257,7 @@ describe('Configuration Validator', () => {
       process.env.GITHUB_TOKEN = 'ghp_valid_token';
       process.env.GITHUB_ORG = 'myorg';
       delete process.env.GITLAB_TOKEN;
-      delete process.env.AZURE_DEVOPS_PAT;
+      delete process.env.AZURE_TOKEN;
 
       const result = validateConfigurationForCLI();
 
@@ -270,7 +270,7 @@ describe('Configuration Validator', () => {
     it('should handle no configured providers', () => {
       delete process.env.GITHUB_TOKEN;
       delete process.env.GITLAB_TOKEN;
-      delete process.env.AZURE_DEVOPS_PAT;
+      delete process.env.AZURE_TOKEN;
 
       const result = validateConfigurationForCLI();
 
@@ -422,7 +422,7 @@ describe('Configuration Validator', () => {
         '   gitlab: GitLab requires GITLAB_TOKEN environment variable',
       );
       expect(mockConsoleLog).toHaveBeenCalledWith(
-        '   azure: Azure DevOps requires AZURE_DEVOPS_PAT and AZURE_ORG environment variables',
+        '   azure: Azure DevOps requires AZURE_TOKEN and AZURE_ORG environment variables',
       );
     });
 

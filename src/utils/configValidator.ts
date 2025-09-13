@@ -34,10 +34,10 @@ const PROVIDER_REQUIREMENTS: Record<string, ProviderRequirements | undefined> = 
     description: 'GitLab requires GITLAB_TOKEN environment variable',
   },
   azure: {
-    requiredEnvVars: ['AZURE_DEVOPS_PAT', 'AZURE_ORG'],
+    requiredEnvVars: ['AZURE_TOKEN', 'AZURE_ORG'],
     optionalEnvVars: ['AZURE_PROJECT'],
     requiredConfigFields: [],
-    description: 'Azure DevOps requires AZURE_DEVOPS_PAT and AZURE_ORG environment variables',
+    description: 'Azure DevOps requires AZURE_TOKEN and AZURE_ORG environment variables',
   },
 };
 
@@ -188,7 +188,7 @@ Use --help <provider> for specific configuration requirements.
 Quick setup examples:
   export GITHUB_TOKEN=ghp_your_token_here
   export GITLAB_TOKEN=glpat_your_token_here  
-  export AZURE_DEVOPS_PAT=your_pat_here
+  export AZURE_TOKEN=your_pat_here
   export AZURE_ORG=your_org_name`;
 }
 

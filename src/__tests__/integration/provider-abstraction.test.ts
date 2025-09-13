@@ -32,7 +32,7 @@ describe('Provider Abstraction Layer Integration', () => {
         type: 'stdio',
         command: 'npx',
         args: ['-y', '@azure-devops/mcp', 'test_organization'],
-        env: { AZURE_DEVOPS_PAT: 'test_token' },
+        env: { AZURE_TOKEN: 'test_token' },
         enabled: true,
       },
     ],
@@ -130,7 +130,7 @@ describe('Provider Abstraction Layer Integration', () => {
           }),
           expect.objectContaining({
             provider: 'azure',
-            reason: expect.stringContaining('AZURE_DEVOPS_PAT'),
+            reason: expect.stringContaining('AZURE_TOKEN'),
           }),
         ]),
       );

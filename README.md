@@ -17,7 +17,7 @@ Project Nexus is a Model Context Protocol (MCP) server that provides fine-graine
 - Unified work items abstraction layer for cross-platform operations
 - Tool aggregation with provider-prefixed naming
 - Hot-reload capability for updating providers without restart
-- Configuration via environment variables and `.mcp.json` file
+- Configuration via environment variables
 - Basic routing of tool calls, resources, and prompts to appropriate providers
 
 **🚧 In Progress:**
@@ -57,55 +57,24 @@ See [INSTALLATION.md](./INSTALLATION.md) for setup instructions.
 
 ## Configuration
 
-Before using Project Nexus, you need to configure which remote project(s) it connects to and provide authentication credentials. Configuration is done via a JSON file and environment variables:
+Before using Project Nexus, you need to provide authentication credentials for each platform you want to use. Configuration is done entirely via environment variables:
 
-### Project Mapping (`.mcp.json`)
-
-Project Nexus uses a mapping file to link your local project (or workspace) to the corresponding remote repository/project in a given platform. By default it looks for a file named `.mcp.json` in the current directory (or you can specify a path via `--config` flag).
-
-**Basic mapping:** If your codebase is a single project, use one mapping. For example, to map the entire project to a GitLab repo:
-
-```json
-{
-  "projects": {
-    "": "gitlab:my-group/my-project"
-  }
-}
-```
-
-In this JSON, the key `""` (empty string) refers to the root of your workspace, and the value is `gitlab:my-group/my-project`. This tells Nexus that your current project corresponds to the GitLab project at `https://gitlab.com/my-group/my-project`. If you use Azure DevOps or GitHub, simply change the prefix accordingly (e.g., `azure:OrgName/ProjectName` or `github:owner/repo`).
-
-**Subprojects:** If your monorepo or workspace contains multiple projects (for instance, a frontend and backend each with their own repository), you can map sub-folders to different remotes. For example:
-
-```json
-{
-  "projects": {
-    "frontend/": "github:myorg/my-frontend",
-    "backend/": "azure:MyOrg/BackendProject"
-  }
-}
-```
-
-Here `frontend/` and `backend/` are directory paths in your workspace. Files under `frontend/` will be served from the GitHub repo `myorg/my-frontend`, while files under `backend/` come from the Azure DevOps project `MyOrg/BackendProject`. This flexible mapping allows one instance of Project Nexus to span multiple repositories potentially on different platforms. Note: Each subproject still maps to exactly one platform – you cannot map the same folder to multiple systems. _(In the future, tasks and code could reside in different systems; for now assume one source of truth per subproject.)_
-
-Project Nexus’s unified resource schema uses these mappings to route tool requests. For instance, when an AI agent asks to open file `frontend/src/index.js`, Nexus knows to fetch it from the GitHub repository configured for `frontend/`. Likewise, a request to list issues will be directed to the appropriate provider based on mapping.
-
-### Authentication
+## Authentication
 
 You will need to provide access tokens or credentials for each platform you use:
 
 - **GitLab:** Set the environment variable `GITLAB_TOKEN` to a Personal Access Token with API access to your GitLab project. For self-hosted GitLab instances, also set `GITLAB_URL` to your instance’s API endpoint (e.g., `https://gitlab.example.com/api/v4`).
 - **GitHub:** Set `GITHUB_TOKEN` to a GitHub PAT (or fine-grained token) that has access to your repo and issues. By default, Nexus will connect to GitHub’s official MCP server using this token. (No custom API URL is needed for github.com; GitHub Enterprise support is planned via configuration of an API URL.)
-- **Azure DevOps:** Set `AZURE_DEVOPS_PAT` (Personal Access Token) for Azure DevOps. This token should have rights to the project (e.g., work item read/write, code read/write as needed). Also set `AZURE_ORG` (the organization name) and `AZURE_PROJECT` (project name) if not already part of the mapping string. If using Azure’s official MCP, an alternate auth method might be used, but PAT is the simplest to start.
+- **Azure DevOps:** Set `AZURE_TOKEN` (Personal Access Token) for Azure DevOps. This token should have rights to the project (e.g., work item read/write, code read/write as needed). Also set `AZURE_ORG` (the organization name) and `AZURE_PROJECT` (project name) if not already part of the mapping string. If using Azure's official MCP, an alternate auth method might be used, but PAT is the simplest to start.
 - **Other Providers:** For future integrations like Jira or Trello, expect to provide similar tokens or API keys (e.g., `JIRA_TOKEN`, `TRELLO_KEY` and `TRELLO_TOKEN`). See provider-specific docs as those adapters become available.
 
-You can supply these environment variables in your shell (or `.env` file) when running Project Nexus. For Docker, use the `-e` flags as shown earlier to inject these variables. For local CLI, ensure your environment is set up (for example, export the variables in your terminal or configure in your system’s environment settings).
+You can supply these environment variables in your shell (or `.env` file) when running Project Nexus. For Docker, use the `-e` flags as shown earlier to inject these variables. For local CLI, ensure your environment is set up (for example, export the variables in your terminal or configure in your system's environment settings).
 
-> **Security tip:** Avoid hard-coding credentials in the `.mcp.json` or any file that might be checked into source control. Use environment variables or a separate secrets file. Project Nexus will read environment variables at runtime and never exposes these secrets to the AI client (the AI sees only the high-level results, not your tokens).
+> **Security tip:** Never hard-code credentials in any file that might be checked into source control. Project Nexus uses environment variables exclusively for authentication, ensuring your tokens remain secure and are never exposed to the AI client (the AI sees only the high-level results, not your tokens).
 
-## Environment Variable-Based Project Mapping & Tool Description Overrides
+## Tool Description Overrides
 
-Inspired by the GitHub MCP server, Project Nexus supports configuration via environment variables for greater portability and simplicity. This approach can replace or supplement the `.mcp.json` file.
+Project Nexus supports customization of tool descriptions via environment variables for better integration with your specific workflows.
 
 ### Project Mapping via Environment Variables
 
@@ -176,7 +145,7 @@ Claude Desktop supports MCP servers via its configuration file. To connect Claud
          "env": {
            "GITLAB_TOKEN": "YOUR_GITLAB_TOKEN",
            "GITHUB_TOKEN": "YOUR_GITHUB_TOKEN",
-           "AZURE_DEVOPS_PAT": "YOUR_AZURE_PAT"
+           "AZURE_TOKEN": "YOUR_AZURE_PAT"
          }
        }
      }
@@ -224,7 +193,7 @@ GitHub Copilot (especially the Copilot Chat in VS Code with Agent mode) supports
          "command": "npx",
          "args": ["-y", "@structured-world/project-nexus-mcp"],
          "env": {
-           "AZURE_DEVOPS_PAT": "${env:AZURE_DEVOPS_PAT}"
+           "AZURE_TOKEN": "${env:AZURE_DEVOPS_PAT}"
          }
        }
      }

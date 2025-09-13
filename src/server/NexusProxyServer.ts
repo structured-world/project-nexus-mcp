@@ -17,6 +17,7 @@ import * as path from 'path';
 import { createServer } from 'http';
 import express from 'express';
 import { TokenStorage } from '../utils/tokenStorage.js';
+import { logger } from '../utils/logger.js';
 
 export class NexusProxyServer {
   private server: Server;
@@ -104,33 +105,33 @@ export class NexusProxyServer {
 
   private setupProviderEventHandlers(): void {
     this.providerManager.on('provider:connected', (provider: { id: string }) => {
-      process.stderr.write(`🔗 Provider connected: ${provider.id}\n`);
+      logger.log(`🔗 Provider connected: ${provider.id}`);
     });
 
     this.providerManager.on('provider:disconnected', (provider: { id: string }) => {
-      process.stderr.write(`🔌 Provider disconnected: ${provider.id}\n`);
+      logger.log(`🔌 Provider disconnected: ${provider.id}`);
     });
 
     this.providerManager.on(
       'provider:error',
       ({ provider, error }: { provider: { id: string }; error: unknown }) => {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        process.stderr.write(`❌ Provider error (${provider.id}): ${errorMessage}\n`);
+        logger.error(`❌ Provider error (${provider.id}): ${errorMessage}`);
       },
     );
 
     this.providerManager.on('provider:auth_failed', (provider: { id: string; error?: string }) => {
       const missingTokensInfo = this.getMissingTokensInfo(provider.id);
-      process.stderr.write(
-        `🔑 Provider authentication failed (${provider.id}): ${provider.error ?? 'Missing authentication tokens'}\n`,
+      logger.error(
+        `🔑 Provider authentication failed (${provider.id}): ${provider.error ?? 'Missing authentication tokens'}`,
       );
       if (missingTokensInfo) {
-        process.stderr.write(`💡 ${missingTokensInfo}\n`);
+        logger.log(`💡 ${missingTokensInfo}`);
       }
     });
 
     this.providerManager.on('provider:update-check', (provider: { id: string }) => {
-      process.stderr.write(`🔄 Checking updates for provider: ${provider.id}\n`);
+      logger.log(`🔄 Checking updates for provider: ${provider.id}`);
     });
   }
 
@@ -151,8 +152,8 @@ export class NexusProxyServer {
         break;
       case 'azure': {
         const missingAzure: string[] = [];
-        if (!process.env.AZURE_DEVOPS_PAT) {
-          missingAzure.push('AZURE_DEVOPS_PAT');
+        if (!process.env.AZURE_TOKEN) {
+          missingAzure.push('AZURE_TOKEN');
         }
         if (!process.env.AZURE_ORG) {
           missingAzure.push('AZURE_ORG');
@@ -319,7 +320,7 @@ export class NexusProxyServer {
         }
 
         // Initiate graceful shutdown
-        process.stderr.write('Debug exit requested - shutting down server...\n');
+        logger.log('Debug exit requested - shutting down server...');
 
         // Return response first
         const response = {
@@ -338,8 +339,8 @@ export class NexusProxyServer {
               await this.shutdown();
               process.exit(0);
             } catch (error) {
-              process.stderr.write(
-                `Error during shutdown: ${error instanceof Error ? error.message : String(error)}\n`,
+              logger.error(
+                `Error during shutdown: ${error instanceof Error ? error.message : String(error)}`,
               );
               process.exit(1);
             }
@@ -420,9 +421,7 @@ export class NexusProxyServer {
         throw new Error('Invalid configuration format');
       }
     } catch {
-      process.stderr.write(
-        `Could not load config from ${finalPath}, using environment variables\n`,
-      );
+      logger.log(`Could not load config from ${finalPath}, using environment variables`);
       this.config = this.loadConfigFromEnv();
     }
   }
@@ -488,7 +487,7 @@ export class NexusProxyServer {
       });
     }
 
-    if (process.env.AZURE_DEVOPS_PAT) {
+    if (process.env.AZURE_TOKEN) {
       providers.push({
         id: 'azure',
         name: 'Azure DevOps',
@@ -496,7 +495,7 @@ export class NexusProxyServer {
         command: 'npx',
         args: ['-y', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
         env: {
-          AZURE_DEVOPS_PAT: process.env.AZURE_DEVOPS_PAT,
+          AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },
         enabled: true,
         autoUpdate: true,
@@ -564,7 +563,7 @@ export class NexusProxyServer {
       });
     }
 
-    if (process.env.AZURE_DEVOPS_PAT) {
+    if (process.env.AZURE_TOKEN) {
       providers.push({
         id: 'azure',
         name: 'Azure DevOps',
@@ -572,7 +571,7 @@ export class NexusProxyServer {
         command: 'npx',
         args: ['-y', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
         env: {
-          AZURE_DEVOPS_PAT: process.env.AZURE_DEVOPS_PAT,
+          AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },
         enabled: true,
         autoUpdate: true,
@@ -587,25 +586,23 @@ export class NexusProxyServer {
   async initialize(): Promise<void> {
     await this.loadConfig();
 
-    process.stderr.write(`\n=== Project Nexus MCP Server Initialization ===\n`);
-    process.stderr.write(`Found ${this.config.providers.length} provider(s) in configuration\n`);
+    logger.log(`\n=== Project Nexus MCP Server Initialization ===`);
+    logger.log(`Found ${this.config.providers.length} provider(s) in configuration`);
 
     // Initialize all providers asynchronously without blocking
     const initPromises = this.config.providers.map(async (providerConfig) => {
       if (providerConfig.enabled) {
-        process.stderr.write(
-          `Initializing provider: ${providerConfig.name} (${providerConfig.id})...\n`,
-        );
+        logger.log(`Initializing provider: ${providerConfig.name} (${providerConfig.id})...`);
         try {
           await this.providerManager.initializeProvider(providerConfig);
-          process.stderr.write(`✓ ${providerConfig.name} initialized successfully\n`);
+          logger.log(`✓ ${providerConfig.name} initialized successfully`);
         } catch (error) {
-          process.stderr.write(
-            `✗ Failed to initialize provider ${providerConfig.id}: ${error instanceof Error ? error.message : String(error)}\n`,
+          logger.error(
+            `✗ Failed to initialize provider ${providerConfig.id}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       } else {
-        process.stderr.write(`- ${providerConfig.name} is disabled\n`);
+        logger.log(`- ${providerConfig.name} is disabled`);
       }
     });
 
@@ -624,8 +621,8 @@ export class NexusProxyServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
 
-    process.stderr.write('\n🚀 Project Nexus MCP Server running in STDIO mode\n');
-    process.stderr.write('📡 Ready to receive MCP requests\n\n');
+    logger.log('\n🚀 Project Nexus MCP Server running in STDIO mode');
+    logger.log('📡 Ready to receive MCP requests\n');
   }
 
   async runHttp(port: number = 3000): Promise<void> {
@@ -670,13 +667,13 @@ export class NexusProxyServer {
   private printProviderStatus(): void {
     const providers = this.providerManager.getAllProviders();
 
-    process.stderr.write(`\\n=== Provider Status Summary ===\\n`);
+    logger.log(`\\n=== Provider Status Summary ===`);
 
     if (providers.length === 0) {
-      process.stderr.write(`⚠️  No providers configured. Set environment variables:\\n`);
-      process.stderr.write(`   GITHUB_TOKEN - for GitHub integration\\n`);
-      process.stderr.write(`   GITLAB_TOKEN - for GitLab integration\\n`);
-      process.stderr.write(`   AZURE_DEVOPS_PAT - for Azure DevOps integration\\n\\n`);
+      logger.warn(`⚠️  No providers configured. Set environment variables:`);
+      logger.log(`   GITHUB_TOKEN - for GitHub integration`);
+      logger.log(`   GITLAB_TOKEN - for GitLab integration`);
+      logger.log(`   AZURE_TOKEN - for Azure DevOps integration\\n`);
       return;
     }
 
@@ -685,42 +682,36 @@ export class NexusProxyServer {
       const status =
         provider.status === 'connected' ? '🟢' : provider.status === 'error' ? '🔴' : '🟡';
 
-      process.stderr.write(
-        `${status} ${provider.config.name} (${provider.id}): ${provider.status}\\n`,
-      );
+      logger.log(`${status} ${provider.config.name} (${provider.id}): ${provider.status}`);
 
       if (provider.status === 'connected') {
         connectedCount++;
-        process.stderr.write(
-          `   Tools: ${provider.tools.size}, Resources: ${provider.resources.size}, Prompts: ${provider.prompts.size}\\n`,
+        logger.log(
+          `   Tools: ${provider.tools.size}, Resources: ${provider.resources.size}, Prompts: ${provider.prompts.size}`,
         );
       } else if (provider.status === 'error' && provider.error) {
-        process.stderr.write(`   Error: ${provider.error}\\n`);
+        logger.error(`   Error: ${provider.error}`);
       }
     }
 
-    process.stderr.write(
-      `\\n✨ ${connectedCount}/${providers.length} providers connected successfully\\n`,
-    );
+    logger.log(`\\n✨ ${connectedCount}/${providers.length} providers connected successfully`);
 
     if (connectedCount > 0) {
       const totalTools = this.providerManager.getAllTools().length;
       const unifiedTools = this.workItemsManager.createUnifiedTools().length;
       const additionalTools = this.createAdditionalTools().length;
 
-      process.stderr.write(
-        `📋 Available tools: ${totalTools + unifiedTools + additionalTools} total\\n`,
-      );
-      process.stderr.write(`   - Provider tools: ${totalTools}\\n`);
-      process.stderr.write(`   - Unified work item tools: ${unifiedTools}\\n`);
-      process.stderr.write(`   - Management tools: ${additionalTools}\\n`);
+      logger.log(`📋 Available tools: ${totalTools + unifiedTools + additionalTools} total`);
+      logger.log(`   - Provider tools: ${totalTools}`);
+      logger.log(`   - Unified work item tools: ${unifiedTools}`);
+      logger.log(`   - Management tools: ${additionalTools}`);
     }
 
-    process.stderr.write(`=====================================\\n`);
+    logger.log(`=====================================`);
   }
 
   async shutdown(): Promise<void> {
-    process.stderr.write(`\\n🛑 Shutting down Project Nexus MCP Server...\\n`);
+    logger.log(`\\n🛑 Shutting down Project Nexus MCP Server...`);
 
     await this.providerManager.shutdown();
 
@@ -730,6 +721,6 @@ export class NexusProxyServer {
 
     await this.server.close();
 
-    process.stderr.write(`✅ Server shutdown complete\\n`);
+    logger.log(`✅ Server shutdown complete`);
   }
 }

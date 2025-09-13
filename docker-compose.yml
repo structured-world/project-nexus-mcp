@@ -83,7 +83,7 @@ services:
       # Azure DevOps Personal Access Token
       # Generate at: https://dev.azure.com/{organization}/_usersSettings/tokens
       # Required scopes: Work Items (Read & Write), Code (Read), Project and Team (Read)
-      AZURE_DEVOPS_PAT: "${AZURE_DEVOPS_PAT:-}"
+      AZURE_TOKEN: "${AZURE_TOKEN:-}"
       
       # Azure DevOps organization name
       # Example: if your URL is https://dev.azure.com/mycompany, use "mycompany"
@@ -267,7 +267,7 @@ volumes:
 # 2. Full setup (all providers):
 #    export GITHUB_TOKEN=ghp_your_token_here
 #    export GITLAB_TOKEN=glpat_your_token_here  
-#    export AZURE_DEVOPS_PAT=your_pat_here
+#    export AZURE_TOKEN=your_pat_here
 #    export AZURE_ORG=your-org
 #    docker-compose up -d
 #
@@ -290,12 +290,34 @@ volumes:
 # # .env.production
 # NODE_ENV=production
 # NEXUS_HTTP_PORT=3000
+#
+# # Authentication Tokens (standardized naming)
 # GITHUB_TOKEN=ghp_your_github_token
 # GITLAB_TOKEN=glpat_your_gitlab_token
-# AZURE_DEVOPS_PAT=your_azure_pat
-# AZURE_ORG=your-azure-org
+# AZURE_TOKEN=your_azure_pat
+#
+# # Provider URLs (for enterprise/self-hosted instances)
+# # GITHUB_URL=https://github.enterprise.com/api/v3  # For GitHub Enterprise
+# GITLAB_URL=https://gitlab.com/api/v4  # Default, change for self-hosted
+# # AZURE_URL=https://dev.azure.com  # For future Azure URL configuration
+#
+# # Provider-specific Configuration
+# AZURE_ORG=your-azure-org  # Mandatory for Azure
+# AZURE_PROJECT=your-project  # Optional, can be left empty
+#
+# # Project Mapping (environment-based)
+# DEFAULT_REPOSITORY=github:myorg/myrepo
+# DEFAULT_TASK=github:myorg/myrepo
+# # FRONTEND_REPOSITORY=github:myorg/frontend  # For monorepos
+# # BACKEND_REPOSITORY=azure:MyOrg/BackendProject
+#
+# # Tool Description Overrides (optional)
+# # TOOL_ADD_ISSUE_COMMENT_DESCRIPTION="Add comment to GitHub issue"
+# # TOOL_CREATE_ISSUE_DESCRIPTION="Create new issue in project"
+#
+# # Debug and Development
 # LOG_LEVEL=info
-# NEXUS_DEBUG_TOOLS=false
+# NEXUS_DEBUG_TOOLS=false  # Set to true for debug tools
 #
 # # .env.development  
 # NODE_ENV=development

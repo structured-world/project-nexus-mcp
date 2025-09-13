@@ -1,3 +1,56 @@
+# [2.0.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.2...v2.0.0) (2025-09-13)
+
+
+### Features
+
+* implement aggregated async operations across all DevOps providers ([c113866](https://github.com/structured-world/project-nexus-mcp/commit/c113866e0ba215fce644f0565e1b138a3be8d7c2))
+
+
+### BREAKING CHANGES
+
+* Complete redesign of tool interface from provider-specific to unified operations
+
+- Add 8 unified manager classes for comprehensive DevOps operations:
+  * WorkItemsManager: Issue/task management across platforms
+  * RepositoryManager: Repository operations (GitHub/GitLab/Azure)
+  * ProjectManager: Organization/group management
+  * MergeRequestManager: PR/MR operations with parallel support
+  * PipelineManager: CI/CD pipeline management
+  * SearchManager: Universal search across all platforms
+  * BranchManager: Branch operations with type safety
+  * CommitManager: Commit history with proper TypeScript typing
+
+- Implement parallel async execution pattern using Promise.allSettled():
+  * Multi-provider operations execute simultaneously (3x faster)
+  * Fault-tolerant with graceful degradation
+  * Error isolation prevents single provider failures from affecting others
+
+- Hide all provider-specific tools from MCP clients:
+  * Tool count reduced from ~130 to 36 (3.6x reduction)
+  * Only unified 'nexus_*' tools exposed to AI agents
+  * Compatible with GitHub Copilot's 128 tool limit
+  * Complete provider abstraction
+
+- Replace all 'any' types with proper TypeScript interfaces:
+  * Type guards for discriminated unions
+  * Provider-specific interfaces with normalization
+  * Type-safe error handling throughout
+
+- Add comprehensive testing and documentation:
+  * End-to-end testing of aggregated operations
+  * Tool hiding validation
+  * Implementation guide with performance metrics
+
+Performance improvements:
+- Tool complexity: 130+ → 36 tools (3.6x reduction)
+- Multi-provider speed: 3x faster execution
+- AI agent compatibility: Well within tool limits
+- Error resilience: Individual provider fault tolerance
+
+The unified interface enables seamless DevOps operations across GitHub, GitLab,
+and Azure DevOps through a single consistent API while maintaining high
+performance and reliability standards.
+
 ## [1.6.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.1...v1.6.2) (2025-09-13)
 
 

@@ -53,7 +53,14 @@ Project Nexus is built to address these gaps. Instead of running separate MCP se
 
 ## Installation & Usage
 
-See [INSTALLATION.md](./INSTALLATION.md) for setup instructions.
+**Quick Start:**
+```sh
+yarn dlx @structured-world/project-nexus-mcp@latest
+```
+
+For detailed installation instructions, MCP client configuration, and Docker setup, see [INSTALLATION.md](./INSTALLATION.md).
+
+**Recommended:** Always use `@latest` to get the newest version with bug fixes and features.
 
 ## Configuration
 

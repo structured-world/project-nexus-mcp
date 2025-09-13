@@ -2,32 +2,80 @@
 
 Project Nexus can be installed as an NPM package or run via Docker. It requires Node.js 16+. Choose one of the following installation methods:
 
+## MCP Client Configuration
+
+For AI assistants that support MCP (like Claude Desktop), add Project Nexus to your MCP settings:
+
+### Example mcp_settings.json (Claude Desktop)
+```json
+{
+  "mcpServers": {
+    "nexus": {
+      "type": "stdio",
+      "command": "yarn",
+      "args": ["dlx", "@structured-world/project-nexus-mcp@latest", "stdio"],
+      "env": {
+        "GITLAB_TOKEN": "your_gitlab_token_here",
+        "GITLAB_URL": "https://gitlab.com/api/v4",
+        "GITHUB_TOKEN": "your_github_token_here",
+        "AZURE_TOKEN": "your_azure_token_here",
+        "AZURE_ORG": "your_organization_name"
+      }
+    }
+  }
+}
+```
+
+**Key points:**
+- Use `@latest` to ensure you always get the newest version with bug fixes and features
+- Replace token placeholders with your actual credentials
+- Add only the providers you need (remove unused tokens)
+- For GitLab self-hosted instances, update `GITLAB_URL` accordingly
+
+### Alternative package managers:
+
+**Using npx:**
+```json
+{
+  "command": "npx",
+  "args": ["@structured-world/project-nexus-mcp@latest", "stdio"]
+}
+```
+
+**Using pnpm:**
+```json
+{
+  "command": "pnpm",
+  "args": ["dlx", "@structured-world/project-nexus-mcp@latest", "stdio"]
+}
+```
+
 ## Using npx (one-shot execution)
 
 For a quick start without explicit install, use npx (comes with npm):
 
 ```sh
-npx @structured-world/project-nexus-mcp
+npx @structured-world/project-nexus-mcp@latest
 ```
 
-This will download and run Project Nexus in one go. The server will start in STDIO mode by default, ready to be invoked by an AI client. You can also pass flags to npx for specific modes (see below).
+This will download and run the latest version of Project Nexus in one go. The server will start in STDIO mode by default, ready to be invoked by an AI client. You can also pass flags to npx for specific modes (see below).
 
 ## Using Yarn dlx
 
 If you prefer Yarn:
 
 ```sh
-yarn dlx @structured-world/project-nexus-mcp
+yarn dlx @structured-world/project-nexus-mcp@latest
 ```
 
-This similarly fetches and runs the package immediately.
+This similarly fetches and runs the latest version immediately.
 
 ## Using PNPM
 
 dlx equivalent:
 
 ```sh
-pnpm dlx @structured-world/project-nexus-mcp
+pnpm dlx @structured-world/project-nexus-mcp@latest
 ```
 
 All the above methods ensure you always run the latest version without global installation. They are great for editor integrations (which often spawn the MCP server process on demand).

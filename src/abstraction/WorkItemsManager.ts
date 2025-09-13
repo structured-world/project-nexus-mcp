@@ -581,12 +581,12 @@ export class WorkItemsManager {
 
     // Try different project listing tools based on provider
     const projectTools = [
-      'search_repositories', // GitHub has this
-      'list_repositories',
-      'list_projects',
-      'get_repositories',
-      'list_user_repositories',
-      'list_org_repositories',
+      'list_repositories', // Direct repo listing (preferred)
+      'list_user_repositories', // User's repos
+      'list_projects', // GitLab/Azure projects
+      'list_organizations', // GitHub organizations
+      'list_groups', // GitLab groups
+      'search_repositories', // GitHub search with user:username
     ];
 
     for (const toolSuffix of projectTools) {
@@ -596,8 +596,31 @@ export class WorkItemsManager {
           // Prepare parameters based on tool type
           let toolParams = {};
           if (toolName.includes('search_repositories')) {
-            // GitHub search_repositories requires a query parameter
-            toolParams = { query: 'stars:>0' }; // Search for public repositories with stars
+            // For GitHub search, we need to get the authenticated username first
+            let username = '';
+            if (providerId === 'github') {
+              // Try to get username from get_me tool
+              const getMeTool = `${providerId}_get_me`;
+              if (provider.tools.has(getMeTool)) {
+                try {
+                  const meResult = await this.providerManager.callTool(getMeTool, {});
+                  if (hasTextContent(meResult)) {
+                    const meJson = meResult.content[0].text;
+                    const meData = JSON.parse(meJson) as Record<string, unknown>;
+                    username = typeof meData.login === 'string' ? meData.login : '';
+                  }
+                } catch {
+                  // If get_me fails, continue without username
+                }
+              }
+            }
+
+            if (username) {
+              toolParams = { query: `user:${username}` };
+            } else {
+              // Skip search if we can't get username
+              continue;
+            }
           }
 
           const result = await this.providerManager.callTool(toolName, toolParams);

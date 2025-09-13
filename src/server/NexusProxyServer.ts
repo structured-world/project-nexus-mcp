@@ -687,15 +687,14 @@ export class NexusProxyServer {
       providers.push({
         id: 'github',
         name: 'GitHub',
-        type: 'stdio' as const,
-        command: 'yarn',
-        args: ['dlx', '-q', '@modelcontextprotocol/server-github'],
-        env: {
-          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-          YARN_ENABLE_PROGRESS_BARS: 'false',
+        type: 'http' as const,
+        url: 'https://api.githubcopilot.com/mcp/',
+        headers: {
+          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+          'X-MCP-Toolsets': process.env.GITHUB_TOOLSETS ?? 'all',
+          'X-MCP-Readonly': 'false',
         },
         enabled: true,
-        autoUpdate: true,
       });
     }
 
@@ -717,7 +716,7 @@ export class NexusProxyServer {
         ],
         env: {
           GITLAB_PERSONAL_ACCESS_TOKEN: process.env.GITLAB_TOKEN,
-          GITLAB_API_URL: process.env.GITLAB_URL ?? 'https://gitlab.com/api/v4',
+          GITLAB_API_URL: process.env.GITLAB_URL ?? 'https://gitlab.com',
         },
         enabled: true,
         autoUpdate: true,
@@ -809,14 +808,14 @@ export class NexusProxyServer {
     setTimeout(() => {
       void (async () => {
         try {
-          await this.workItemsManager.warmupCaches();
+          await this.providerManager.warmupCaches();
         } catch (error) {
           logger.error(
             `[cache] Cache warmup failed: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       })();
-    }, 2000); // Wait 2 seconds after server startup to avoid interfering with initialization
+    }, 5000); // Wait 5 seconds after server startup to avoid interfering with initialization
   }
 
   async runStdio(): Promise<void> {
@@ -1292,9 +1291,7 @@ export class NexusProxyServer {
   async shutdown(): Promise<void> {
     logger.log(`\\n🛑 Shutting down Project Nexus MCP Server...`);
 
-    // Shutdown cache manager first
-    this.workItemsManager.getCacheManager().shutdown();
-
+    // Provider manager will handle its own cache cleanup during shutdown
     await this.providerManager.shutdown();
 
     if (this.httpServer) {

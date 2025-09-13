@@ -1,9 +1,12 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
 import { ProviderConfig, ProviderInstance, QueuedRequest } from '../types/index.js';
 import { classifyError, shouldAttemptReconnection } from '../utils/errorClassifier.js';
+import { hasTextContent } from '../utils/typeGuards.js';
+import { ProjectCacheData, UserRole } from '../cache/CacheManager.js';
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 
@@ -11,6 +14,10 @@ export class ProviderManager extends EventEmitter {
   private providers: Map<string, ProviderInstance> = new Map();
   private updateCheckInterval?: NodeJS.Timeout;
   private reconnectionTimers: Map<string, NodeJS.Timeout> = new Map();
+
+  // Cache structure: [provider -> projects] and [provider -> project -> users]
+  private projectsCache: Map<string, ProjectCacheData[]> = new Map();
+  private usersCache: Map<string, Map<string, UserRole[]>> = new Map();
 
   // Request queuing constants
   private static readonly REQUEST_TIMEOUT_MS = 30000; // 30 seconds
@@ -201,10 +208,29 @@ export class ProviderManager extends EventEmitter {
     return client;
   }
 
-  private createHTTPClient(_config: ProviderConfig): Promise<Client> {
-    // HTTP transport is not yet available in the SDK
-    // For now, we'll throw an error for HTTP providers
-    return Promise.reject(new Error('HTTP transport not yet implemented'));
+  private async createHTTPClient(config: ProviderConfig): Promise<Client> {
+    if (!config.url) {
+      throw new Error('URL is required for HTTP transport');
+    }
+
+    const client = new Client(
+      {
+        name: 'nexus-proxy-client',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      },
+    );
+
+    // Use Streamable HTTP transport for MCP communication
+    const transport = new StreamableHTTPClientTransport(new URL(config.url), {
+      requestInit: {
+        headers: config.headers ?? {},
+      },
+    });
+    await client.connect(transport);
+    return client;
   }
 
   private async connectAndLoadCapabilities(
@@ -357,7 +383,14 @@ export class ProviderManager extends EventEmitter {
     const allTools: Tool[] = [];
     for (const provider of this.providers.values()) {
       if (provider.status === 'connected') {
-        allTools.push(...Array.from(provider.tools.values()));
+        const filteredTools = Array.from(provider.tools.values()).filter((tool) => {
+          // Hide internal GitLab tools that should not be exposed to clients
+          if (tool.name === 'gitlab_list_user_projects') {
+            return false;
+          }
+          return true;
+        });
+        allTools.push(...filteredTools);
       }
     }
     return allTools;
@@ -551,6 +584,10 @@ export class ProviderManager extends EventEmitter {
   async shutdown(): Promise<void> {
     this.stopAutoUpdate();
     this.clearReconnectionTimers();
+
+    // Clear provider caches
+    this.projectsCache.clear();
+    this.usersCache.clear();
 
     for (const providerId of this.providers.keys()) {
       await this.disconnectProvider(providerId);
@@ -914,5 +951,341 @@ export class ProviderManager extends EventEmitter {
       clearTimeout(timer);
       this.reconnectionTimers.delete(id);
     }
+  }
+
+  /**
+   * Warm up caches for all connected providers
+   */
+  async warmupCaches(): Promise<void> {
+    const { logger } = await import('../utils/logger.js');
+    logger.debug('[cache] Starting provider-level cache warmup...');
+
+    const providers = Array.from(this.providers.values()).filter((p) => p.status === 'connected');
+
+    // Warm up projects and users sequentially for each provider (to avoid race conditions)
+    for (const provider of providers) {
+      try {
+        logger.debug(`[cache] Warming up projects for ${provider.id}...`);
+        const projects = await this.fetchProjectsFromProvider(provider.id);
+        this.projectsCache.set(provider.id, projects);
+
+        logger.debug(`[cache] Warming up users for ${provider.id}...`);
+        const users = this.fetchUsersFromProvider(provider.id);
+        this.usersCache.set(provider.id, users);
+
+        logger.debug(
+          `[cache] Warmup completed for ${provider.id}: ${projects.length} projects, ${Array.from(users.values()).reduce((total, projectUsers) => total + projectUsers.length, 0)} users`,
+        );
+      } catch (error) {
+        logger.debug(`[cache] Warmup failed for ${provider.id}: ${String(error)}`);
+        // Continue with next provider even if this one fails
+      }
+    }
+    logger.debug('[cache] Provider-level cache warmup completed for all providers');
+  }
+
+  /**
+   * Fetch projects from a specific provider (used for cache warming)
+   */
+  private async fetchProjectsFromProvider(providerId: string): Promise<ProjectCacheData[]> {
+    const provider = this.providers.get(providerId);
+    if (!provider || provider.status !== 'connected') {
+      return [];
+    }
+
+    const projects: ProjectCacheData[] = [];
+
+    // Try different project listing tools based on provider
+    const projectTools =
+      providerId === 'gitlab'
+        ? [
+            'list_user_projects', // GitLab user projects (internal tool)
+            'search_globally', // GitLab global search for projects
+            'list_projects', // GitLab projects
+            'list_groups', // GitLab groups
+          ]
+        : providerId === 'azure'
+          ? [
+              'core_list_projects', // Azure DevOps projects (correct tool name)
+              'list_projects', // Legacy fallback
+              'get_projects', // Alternative fallback
+            ]
+          : [
+              'list_repositories', // GitHub direct repo listing (preferred)
+              'list_user_repositories', // GitHub user's repos
+              'search_repositories', // GitHub search with user:username
+              'list_organizations', // GitHub organizations
+            ];
+
+    for (const toolSuffix of projectTools) {
+      const toolName = `${providerId}_${toolSuffix}`;
+      if (provider.tools.has(toolName)) {
+        try {
+          const { logger } = await import('../utils/logger.js');
+          logger.debug(`[cache] Trying tool: ${toolName}`);
+
+          // Prepare parameters based on tool type
+          let toolParams = {};
+          if (toolName.includes('search_globally')) {
+            // GitLab search_globally with scope=projects and active=true
+            toolParams = { scope: 'projects', active: 'true' };
+          } else if (toolName.includes('search_repositories')) {
+            // For GitHub search, we need to get the authenticated username first
+            let username = '';
+            if (providerId === 'github') {
+              // Try to get username from get_me tool
+              const getMeTool = `${providerId}_get_me`;
+              if (provider.tools.has(getMeTool)) {
+                try {
+                  const meResult = await this.callTool(getMeTool, {});
+                  if (hasTextContent(meResult)) {
+                    const meJson = meResult.content[0].text;
+                    const meData = JSON.parse(meJson) as Record<string, unknown>;
+                    username = typeof meData.login === 'string' ? meData.login : '';
+                  }
+                } catch {
+                  // Skip search if we can't get username
+                  continue;
+                }
+              }
+            } else {
+              // Skip search if we can't get username
+              continue;
+            }
+            toolParams = { query: `user:${username}` };
+          }
+
+          logger.debug(`[cache] Calling tool: ${toolName} with params:`, toolParams);
+          const result = await this.callTool(toolName, toolParams);
+          logger.debug(`[cache] Tool call successful: ${toolName}`);
+
+          if (hasTextContent(result)) {
+            const projectsJson = result.content[0].text;
+            const parsedProjects: unknown = JSON.parse(projectsJson);
+
+            // Handle both array responses and GitHub-style object responses
+            let projectArray: unknown[] = [];
+            if (Array.isArray(parsedProjects)) {
+              projectArray = parsedProjects;
+            } else if (typeof parsedProjects === 'object' && parsedProjects !== null) {
+              // GitHub search API returns { items: [...], total_count: number }
+              const searchResult = parsedProjects as Record<string, unknown>;
+              if (Array.isArray(searchResult.items)) {
+                projectArray = searchResult.items;
+              }
+            }
+
+            if (projectArray.length > 0) {
+              for (const project of projectArray) {
+                if (typeof project === 'object' && project !== null) {
+                  const proj = project as Record<string, unknown>;
+                  const projectId =
+                    typeof proj.full_name === 'string'
+                      ? proj.full_name
+                      : typeof proj.path_with_namespace === 'string'
+                        ? proj.path_with_namespace
+                        : typeof proj.name === 'string'
+                          ? proj.name
+                          : typeof proj.id === 'string' || typeof proj.id === 'number'
+                            ? String(proj.id)
+                            : '';
+                  const projectName =
+                    typeof proj.name === 'string'
+                      ? proj.name
+                      : typeof proj.title === 'string'
+                        ? proj.title
+                        : projectId;
+
+                  if (projectId && projectName) {
+                    // Also fetch project members if available
+                    const members = await this.fetchProjectMembers(providerId, projectId);
+
+                    // Determine project URL based on provider
+                    let projectUrl: string | undefined;
+                    if (typeof proj.html_url === 'string') {
+                      projectUrl = proj.html_url; // GitHub
+                    } else if (typeof proj.web_url === 'string') {
+                      projectUrl = proj.web_url; // GitLab
+                    } else if (typeof proj.url === 'string') {
+                      projectUrl = proj.url; // Azure
+                    }
+
+                    projects.push({
+                      id: projectId,
+                      name: projectName,
+                      provider: providerId,
+                      description:
+                        typeof proj.description === 'string' ? proj.description : undefined,
+                      url: projectUrl,
+                      members: members,
+                    });
+                  }
+                }
+              }
+
+              // Return after first successful tool
+              break;
+            }
+          }
+        } catch {
+          // Continue with next tool if current one fails
+          continue;
+        }
+      }
+    }
+
+    return projects;
+  }
+
+  /**
+   * Fetch project members from a specific provider
+   */
+  private async fetchProjectMembers(providerId: string, projectId: string): Promise<UserRole[]> {
+    const provider = this.providers.get(providerId);
+    if (!provider || provider.status !== 'connected') {
+      return [];
+    }
+
+    const memberTools = [
+      'list_project_members', // GitLab
+      'list_repository_collaborators', // GitHub
+      'list_collaborators', // GitHub alternative
+      'list_contributors', // GitHub contributors
+      'get_project_members', // Azure DevOps
+      'list_team_members', // Azure DevOps alternative
+    ];
+
+    for (const toolSuffix of memberTools) {
+      const toolName = `${providerId}_${toolSuffix}`;
+      if (provider.tools.has(toolName)) {
+        try {
+          const result = await this.callTool(toolName, {
+            project_id: projectId,
+            id: projectId,
+            repo: projectId,
+            owner: projectId.split('/')[0], // For GitHub owner/repo format
+            repository: projectId,
+          });
+
+          if (hasTextContent(result)) {
+            const membersJson = result.content[0].text;
+            const parsedMembers: unknown = JSON.parse(membersJson);
+
+            if (Array.isArray(parsedMembers)) {
+              const members: UserRole[] = [];
+              for (const member of parsedMembers) {
+                if (typeof member === 'object' && member !== null) {
+                  const mem = member as Record<string, unknown>;
+                  const userId =
+                    typeof mem.id === 'string' || typeof mem.id === 'number'
+                      ? String(mem.id)
+                      : typeof mem.login === 'string'
+                        ? mem.login
+                        : '';
+                  const username =
+                    typeof mem.username === 'string'
+                      ? mem.username
+                      : typeof mem.login === 'string'
+                        ? mem.login
+                        : userId;
+                  const displayName =
+                    typeof mem.name === 'string'
+                      ? mem.name
+                      : typeof mem.display_name === 'string'
+                        ? mem.display_name
+                        : username;
+
+                  // Extract role information based on provider
+                  let role = 'member'; // default role
+                  let accessLevel: number | undefined;
+
+                  if (typeof mem.role === 'string') {
+                    role = mem.role; // GitLab
+                  } else if (typeof mem.permissions === 'string') {
+                    role = mem.permissions; // GitHub
+                  } else if (typeof mem.access_level === 'number') {
+                    accessLevel = mem.access_level; // GitLab access levels
+                    // Convert GitLab access levels to roles
+                    if (accessLevel >= 50) role = 'maintainer';
+                    else if (accessLevel >= 40) role = 'developer';
+                    else if (accessLevel >= 30) role = 'developer';
+                    else if (accessLevel >= 20) role = 'reporter';
+                    else role = 'guest';
+                  }
+
+                  if (userId && username) {
+                    members.push({
+                      userId,
+                      username,
+                      displayName,
+                      email: typeof mem.email === 'string' ? mem.email : undefined,
+                      role,
+                      accessLevel,
+                    });
+                  }
+                }
+              }
+              return members;
+            }
+          }
+        } catch {
+          // Continue with next tool if current one fails
+          continue;
+        }
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Fetch users from a specific provider (used for cache warming)
+   */
+  private fetchUsersFromProvider(providerId: string): Map<string, UserRole[]> {
+    const usersByProject = new Map<string, UserRole[]>();
+
+    // Get projects first to populate users per project structure
+    const projects = this.projectsCache.get(providerId) ?? [];
+
+    for (const project of projects) {
+      if (project.members) {
+        usersByProject.set(project.id, project.members);
+      }
+    }
+
+    return usersByProject;
+  }
+
+  /**
+   * Get cached projects for a provider
+   */
+  getCachedProjects(providerId: string): ProjectCacheData[] {
+    return this.projectsCache.get(providerId) ?? [];
+  }
+
+  /**
+   * Get cached users for a provider and project
+   */
+  getCachedUsers(providerId: string, projectId?: string): UserRole[] {
+    const providerUsers = this.usersCache.get(providerId);
+    if (!providerUsers) return [];
+
+    if (projectId) {
+      return providerUsers.get(projectId) ?? [];
+    }
+
+    // Return all users from all projects
+    const allUsers: UserRole[] = [];
+    for (const projectUsers of providerUsers.values()) {
+      allUsers.push(...projectUsers);
+    }
+
+    // Deduplicate by userId
+    const uniqueUsers = new Map<string, UserRole>();
+    for (const user of allUsers) {
+      uniqueUsers.set(user.userId, user);
+    }
+
+    return Array.from(uniqueUsers.values());
   }
 }

@@ -594,7 +594,14 @@ export class WorkItemsManager {
       const toolName = `${providerId}_${toolSuffix}`;
       if (provider.tools.has(toolName)) {
         try {
-          const result = await this.providerManager.callTool(toolName, {});
+          // Prepare parameters based on tool type
+          let toolParams = {};
+          if (toolName.includes('search_repositories')) {
+            // GitHub search_repositories requires a query parameter
+            toolParams = { query: 'stars:>0' }; // Search for public repositories with stars
+          }
+
+          const result = await this.providerManager.callTool(toolName, toolParams);
 
           if (hasTextContent(result)) {
             const projectsJson = result.content[0].text;
@@ -748,7 +755,14 @@ export class WorkItemsManager {
       const toolName = `${providerId}_${toolSuffix}`;
       if (provider.tools.has(toolName)) {
         try {
-          const result = await this.providerManager.callTool(toolName, {});
+          // Prepare parameters based on tool type
+          let toolParams = {};
+          if (toolName.includes('search_users')) {
+            // GitHub search_users requires a q parameter
+            toolParams = { q: 'type:user' }; // Search for users
+          }
+
+          const result = await this.providerManager.callTool(toolName, toolParams);
 
           if (hasTextContent(result)) {
             const usersJson = result.content[0].text;
@@ -891,7 +905,7 @@ export class WorkItemsManager {
       {
         name: 'nexus_search_projects',
         description:
-          'Search for projects/repositories across all configured providers. Use this to discover project identifiers before using other work item tools. Results are cached for 15 minutes.',
+          'FIRST STEP: Search for projects/repositories across all providers when you need to find a project by partial name. This returns full project paths with provider prefixes (e.g., "gitlab:lantec/uscribe/recipes") that you can then use with nexus_list_work_items. ALWAYS use this first when user mentions project names like "recipes", "backend", etc. Results are cached for 15 minutes.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -946,14 +960,15 @@ export class WorkItemsManager {
       {
         name: 'nexus_list_work_items',
         description:
-          'List work items (issues, tasks, etc.). BEHAVIOR: If project parameter is omitted, searches ALL configured providers. If project is specified with provider prefix (e.g., "gitlab:myorg/myproject"), searches only that specific project. To find work items from a project when you don\'t know the provider, omit the project parameter and use other filters like labels or assignee.',
+          'List work items (issues, tasks, etc.) from a SPECIFIC project. REQUIRES full project path with provider prefix (e.g., "gitlab:lantec/uscribe/backend", "github:microsoft/vscode"). IMPORTANT: If you only know partial project name (like "recipes" or "backend"), you MUST first use nexus_search_projects to find the full project path. DO NOT pass raw project names without provider prefix - this will cause errors. Examples of correct usage: project="gitlab:myorg/myrepo", project="github:owner/repo", project="azure:projectname".',
         inputSchema: {
           type: 'object',
+          required: ['project'],
           properties: {
             project: {
               type: 'string',
               description:
-                'Optional project identifier with provider prefix (e.g., "github:owner/repo", "gitlab:group/project", "azure:projectname"). If omitted, searches all providers. DO NOT pass raw project names without provider prefix.',
+                'REQUIRED: Project identifier with provider prefix (e.g., "github:owner/repo", "gitlab:group/project", "azure:projectname"). NEVER use raw project names like "recipes" or "backend" - use nexus_search_projects first to find the full path.',
             },
             status: {
               type: 'string',

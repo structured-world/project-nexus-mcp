@@ -233,48 +233,80 @@ export class BranchManager {
   }
 
   private normalizeBranch(branch: ProviderBranch, provider: string): Branch {
-    const branchData = branch as Record<string, any>;
+    // Type guards for different provider branch formats
+    const isGitHubBranch = (b: unknown): b is GitHubBranch =>
+      typeof b === 'object' && b !== null && 'name' in b && 'commit' in b;
 
-    // Safely extract name
-    const name =
-      (branchData.name as string) ?? (branchData.ref as string)?.replace('refs/heads/', '') ?? '';
+    const isGitLabBranch = (b: unknown): b is GitLabBranch =>
+      typeof b === 'object' && b !== null && 'name' in b && 'commit' in b && 'web_url' in b;
 
-    // Safely extract SHA
-    const sha =
-      (branchData.commit?.sha as string) ??
-      (branchData.object?.sha as string) ??
-      (branchData.sha as string) ??
-      (branchData.objectId as string) ??
-      '';
+    const isAzureBranch = (b: unknown): b is AzureBranch =>
+      typeof b === 'object' && b !== null && 'name' in b && 'objectId' in b;
 
-    // Safely extract commit info
-    let lastCommit: Branch['lastCommit'] = undefined;
-    if (branchData.commit) {
-      lastCommit = {
-        sha: (branchData.commit.sha as string) ?? (branchData.commit.id as string) ?? '',
-        message:
-          (branchData.commit.message as string) ??
-          (branchData.commit.commit?.message as string) ??
-          '',
-        author:
-          (branchData.commit.author?.login as string) ??
-          (branchData.commit.commit?.author?.name as string) ??
-          (branchData.commit.author_name as string) ??
-          '',
-        date:
-          (branchData.commit.commit?.author?.date as string) ??
-          (branchData.commit.created_at as string) ??
-          '',
+    if (isGitHubBranch(branch)) {
+      return {
+        name: branch.name,
+        sha: branch.commit.sha,
+        protected: branch.protected,
+        default: false, // GitHub branches don't have default field in this interface
+        provider,
+        lastCommit: branch.commit.commit
+          ? {
+              sha: branch.commit.sha,
+              message: branch.commit.commit.message,
+              author: branch.commit.author?.login ?? branch.commit.commit.author.name,
+              date: branch.commit.commit.author.date,
+            }
+          : undefined,
       };
     }
+
+    if (isGitLabBranch(branch)) {
+      return {
+        name: branch.name,
+        sha: branch.commit.id,
+        protected: branch.protected,
+        default: branch.default,
+        url: branch.web_url,
+        provider,
+        lastCommit: {
+          sha: branch.commit.id,
+          message: branch.commit.message,
+          author: branch.commit.author_name,
+          date: branch.commit.created_at,
+        },
+      };
+    }
+
+    if (isAzureBranch(branch)) {
+      return {
+        name: branch.name,
+        sha: branch.objectId,
+        protected: false, // Azure doesn't provide protection info
+        default: false,
+        provider,
+      };
+    }
+
+    // Fallback for unknown branch format
+    const branchData = branch;
     return {
-      name,
-      sha,
-      protected: (branchData.protected as boolean) ?? false,
-      default: (branchData.default_branch as boolean) ?? (branchData.default as boolean) ?? false,
-      url: (branchData.url as string) ?? (branchData.web_url as string),
+      name: typeof branchData.name === 'string' ? branchData.name : '',
+      sha:
+        typeof branchData.sha === 'string'
+          ? branchData.sha
+          : typeof branchData.objectId === 'string'
+            ? branchData.objectId
+            : '',
+      protected: Boolean(branchData.protected),
+      default: Boolean(branchData.default ?? branchData.default_branch),
+      url:
+        typeof branchData.url === 'string'
+          ? branchData.url
+          : typeof branchData.web_url === 'string'
+            ? branchData.web_url
+            : undefined,
       provider,
-      lastCommit,
     };
   }
 

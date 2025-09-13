@@ -134,8 +134,8 @@ export class PipelineManager {
             const parsedPipelines: unknown = JSON.parse(pipelinesJson);
 
             if (Array.isArray(parsedPipelines)) {
-              return parsedPipelines.map((pipeline: any) =>
-                this.normalizePipeline(pipeline, provider),
+              return parsedPipelines.map((pipeline: unknown) =>
+                this.normalizePipeline(pipeline as Record<string, unknown>, provider),
               );
             }
           }
@@ -186,7 +186,7 @@ export class PipelineManager {
           if (hasTextContent(result)) {
             const pipelineJson = result.content[0].text;
             const parsedPipeline: unknown = JSON.parse(pipelineJson);
-            return this.normalizePipeline(parsedPipeline, provider);
+            return this.normalizePipeline(parsedPipeline as Record<string, unknown>, provider);
           }
         } catch (error) {
           console.error(
@@ -230,16 +230,16 @@ export class PipelineManager {
             repo: repositoryName,
             repository: repositoryName,
             project: `${project.split(':')[1]}/${repositoryName}`,
-            ref: options.ref || 'main',
+            ref: options.ref ?? 'main',
             workflow_id: options.workflow,
             workflow: options.workflow,
-            inputs: options.inputs || {},
+            inputs: options.inputs ?? {},
           });
 
           if (hasTextContent(result)) {
             const pipelineJson = result.content[0].text;
             const parsedPipeline: unknown = JSON.parse(pipelineJson);
-            return this.normalizePipeline(parsedPipeline, provider);
+            return this.normalizePipeline(parsedPipeline as Record<string, unknown>, provider);
           }
         } catch (error) {
           console.error(
@@ -335,7 +335,9 @@ export class PipelineManager {
             const parsedJobs: unknown = JSON.parse(jobsJson);
 
             if (Array.isArray(parsedJobs)) {
-              return parsedJobs.map((job: any) => this.normalizePipelineJob(job, provider));
+              return parsedJobs.map((job: unknown) =>
+                this.normalizePipelineJob(job as Record<string, unknown>, provider),
+              );
             }
           }
         } catch (error) {
@@ -452,62 +454,118 @@ export class PipelineManager {
     return [];
   }
 
-  private normalizePipeline(pipeline: any, provider: string): Pipeline {
+  private normalizePipeline(pipeline: Record<string, unknown>, provider: string): Pipeline {
     return {
-      id: pipeline.id?.toString() || pipeline.run_id?.toString() || '',
-      name: pipeline.name || pipeline.workflow?.name || pipeline.display_name || '',
-      status: this.normalizeStatus(pipeline.status || pipeline.conclusion || pipeline.state),
-      url: pipeline.html_url || pipeline.web_url || pipeline.url || '',
-      branch: pipeline.head_branch || pipeline.ref || pipeline.branch || '',
-      commit: pipeline.head_sha || pipeline.sha || pipeline.commit?.id || '',
-      author:
-        pipeline.actor?.login || pipeline.user?.username || pipeline.triggering_actor?.login || '',
+      id: String(pipeline.id ?? pipeline.run_id ?? ''),
+      name: String(
+        pipeline.name ??
+          (typeof pipeline.workflow === 'object' &&
+          pipeline.workflow &&
+          typeof (pipeline.workflow as Record<string, unknown>).name === 'string'
+            ? (pipeline.workflow as Record<string, unknown>).name
+            : '') ??
+          pipeline.display_name ??
+          '',
+      ),
+      status: this.normalizeStatus(
+        String(pipeline.status ?? pipeline.conclusion ?? pipeline.state),
+      ),
+      url: String(pipeline.html_url ?? pipeline.web_url ?? pipeline.url ?? ''),
+      branch: String(pipeline.head_branch ?? pipeline.ref ?? pipeline.branch ?? ''),
+      commit: String(
+        pipeline.head_sha ??
+          pipeline.sha ??
+          (typeof pipeline.commit === 'object' &&
+          pipeline.commit &&
+          typeof (pipeline.commit as Record<string, unknown>).id === 'string'
+            ? (pipeline.commit as Record<string, unknown>).id
+            : '') ??
+          '',
+      ),
+      author: String(
+        (typeof pipeline.actor === 'object' &&
+        pipeline.actor &&
+        typeof (pipeline.actor as Record<string, unknown>).login === 'string'
+          ? (pipeline.actor as Record<string, unknown>).login
+          : '') ??
+          (typeof pipeline.user === 'object' &&
+          pipeline.user &&
+          typeof (pipeline.user as Record<string, unknown>).username === 'string'
+            ? (pipeline.user as Record<string, unknown>).username
+            : '') ??
+          (typeof pipeline.triggering_actor === 'object' &&
+          pipeline.triggering_actor &&
+          typeof (pipeline.triggering_actor as Record<string, unknown>).login === 'string'
+            ? (pipeline.triggering_actor as Record<string, unknown>).login
+            : '') ??
+          '',
+      ),
       provider: provider,
-      createdAt: pipeline.created_at || pipeline.createdAt,
-      startedAt: pipeline.run_started_at || pipeline.started_at || pipeline.startedAt,
-      finishedAt: pipeline.updated_at || pipeline.finished_at || pipeline.finishedAt,
+      createdAt:
+        (pipeline.created_at as string | undefined) ?? (pipeline.createdAt as string | undefined),
+      startedAt:
+        (pipeline.run_started_at as string | undefined) ??
+        (pipeline.started_at as string | undefined) ??
+        (pipeline.startedAt as string | undefined),
+      finishedAt:
+        (pipeline.updated_at as string | undefined) ??
+        (pipeline.finished_at as string | undefined) ??
+        (pipeline.finishedAt as string | undefined),
       duration: this.calculateDuration(
-        pipeline.run_started_at || pipeline.started_at,
-        pipeline.updated_at || pipeline.finished_at,
+        String(pipeline.run_started_at ?? pipeline.started_at ?? ''),
+        String(pipeline.updated_at ?? pipeline.finished_at ?? ''),
       ),
     };
   }
 
-  private normalizePipelineJob(job: any, provider: string): PipelineJob {
+  private normalizePipelineJob(job: Record<string, unknown>, provider: string): PipelineJob {
     return {
-      id: job.id?.toString() || '',
-      name: job.name || job.job_name || '',
-      status: this.normalizeStatus(job.status || job.conclusion || job.state),
-      stage: job.stage || job.workflow_name,
-      url: job.html_url || job.web_url || job.url,
+      id: String(job.id ?? ''),
+      name: String(job.name ?? job.job_name ?? ''),
+      status: this.normalizeStatus(String(job.status ?? job.conclusion ?? job.state)),
+      stage: (job.stage as string | undefined) ?? (job.workflow_name as string | undefined),
+      url:
+        (job.html_url as string | undefined) ??
+        (job.web_url as string | undefined) ??
+        (job.url as string | undefined),
       provider: provider,
-      createdAt: job.created_at || job.createdAt,
-      startedAt: job.started_at || job.startedAt,
-      finishedAt: job.completed_at || job.finished_at || job.finishedAt,
+      createdAt: (job.created_at as string | undefined) ?? (job.createdAt as string | undefined),
+      startedAt: (job.started_at as string | undefined) ?? (job.startedAt as string | undefined),
+      finishedAt:
+        (job.completed_at as string | undefined) ??
+        (job.finished_at as string | undefined) ??
+        (job.finishedAt as string | undefined),
       duration: this.calculateDuration(
-        job.started_at || job.startedAt,
-        job.completed_at || job.finished_at,
+        String(job.started_at ?? job.startedAt ?? ''),
+        String(job.completed_at ?? job.finished_at ?? ''),
       ),
     };
   }
 
-  private normalizePipelineArtifact(artifact: any, provider: string): PipelineArtifact {
+  private normalizePipelineArtifact(
+    artifact: Record<string, unknown>,
+    provider: string,
+  ): PipelineArtifact {
     return {
-      id: artifact.id?.toString() || '',
-      name: artifact.name || '',
-      size: artifact.size_in_bytes || artifact.size,
-      url: artifact.url || artifact.web_url,
-      downloadUrl: artifact.archive_download_url || artifact.download_url,
+      id: String(artifact.id ?? ''),
+      name: String(artifact.name ?? ''),
+      size: (artifact.size_in_bytes as number | undefined) ?? (artifact.size as number | undefined),
+      url: (artifact.url as string | undefined) ?? (artifact.web_url as string | undefined),
+      downloadUrl:
+        (artifact.archive_download_url as string | undefined) ??
+        (artifact.download_url as string | undefined),
       provider: provider,
-      createdAt: artifact.created_at || artifact.createdAt,
-      expiresAt: artifact.expires_at || artifact.expiresAt,
+      createdAt:
+        (artifact.created_at as string | undefined) ?? (artifact.createdAt as string | undefined),
+      expiresAt:
+        (artifact.expires_at as string | undefined) ?? (artifact.expiresAt as string | undefined),
     };
   }
 
   private normalizeStatus(
     status: string,
   ): 'success' | 'failure' | 'running' | 'pending' | 'cancelled' | 'skipped' {
-    const lowStatus = status?.toLowerCase() || '';
+    const lowStatus = status?.toLowerCase() ?? '';
     if (['success', 'successful', 'passed', 'completed'].includes(lowStatus)) return 'success';
     if (['failure', 'failed', 'error'].includes(lowStatus)) return 'failure';
     if (['running', 'in_progress', 'pending'].includes(lowStatus)) return 'running';

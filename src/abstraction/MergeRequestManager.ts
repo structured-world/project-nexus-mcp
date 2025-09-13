@@ -2,42 +2,7 @@ import { ProviderManager } from '../providers/ProviderManager.js';
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { hasTextContent } from '../utils/typeGuards.js';
 
-// Provider API response interfaces
-interface GitHubPullRequest {
-  id: number;
-  number: number;
-  title: string;
-  body?: string;
-  state: string;
-  user: { login: string };
-  head: { ref: string };
-  base: { ref: string };
-  html_url: string;
-  draft: boolean;
-  mergeable?: boolean;
-  created_at: string;
-  updated_at: string;
-  merged_at?: string;
-}
-
-interface GitLabMergeRequest {
-  id: number;
-  iid: number;
-  title: string;
-  description?: string;
-  state: string;
-  author: { username: string };
-  source_branch: string;
-  target_branch: string;
-  web_url: string;
-  work_in_progress: boolean;
-  merge_status?: string;
-  created_at: string;
-  updated_at: string;
-  merged_at?: string;
-}
-
-type ProviderMergeRequest = GitHubPullRequest | GitLabMergeRequest | Record<string, unknown>;
+// Provider-specific interfaces removed - using Record<string, unknown> for flexibility
 
 export interface MergeRequest {
   id: string;
@@ -159,7 +124,7 @@ export class MergeRequestManager {
 
             if (Array.isArray(parsedMRs)) {
               return parsedMRs.map((mr) =>
-                this.normalizeMergeRequest(mr as ProviderMergeRequest, provider),
+                this.normalizeMergeRequest(mr as Record<string, unknown>, provider),
               );
             }
           }
@@ -208,7 +173,7 @@ export class MergeRequestManager {
           if (hasTextContent(result)) {
             const mrJson = result.content[0].text;
             const parsedMR: unknown = JSON.parse(mrJson);
-            return this.normalizeMergeRequest(parsedMR, provider);
+            return this.normalizeMergeRequest(parsedMR as Record<string, unknown>, provider);
           }
         } catch (error) {
           console.error(
@@ -260,13 +225,13 @@ export class MergeRequestManager {
             source_branch: data.sourceBranch,
             base: data.targetBranch,
             target_branch: data.targetBranch,
-            draft: data.draft || false,
+            draft: data.draft ?? false,
           });
 
           if (hasTextContent(result)) {
             const mrJson = result.content[0].text;
             const parsedMR: unknown = JSON.parse(mrJson);
-            return this.normalizeMergeRequest(parsedMR, provider);
+            return this.normalizeMergeRequest(parsedMR as Record<string, unknown>, provider);
           }
         } catch (error) {
           console.error(
@@ -322,7 +287,7 @@ export class MergeRequestManager {
           if (hasTextContent(result)) {
             const mrJson = result.content[0].text;
             const parsedMR: unknown = JSON.parse(mrJson);
-            return this.normalizeMergeRequest(parsedMR, provider);
+            return this.normalizeMergeRequest(parsedMR as Record<string, unknown>, provider);
           }
         } catch (error) {
           console.error(
@@ -437,28 +402,85 @@ export class MergeRequestManager {
     return false;
   }
 
-  private normalizeMergeRequest(mr: any, provider: string): MergeRequest {
+  private normalizeMergeRequest(mr: Record<string, unknown>, provider: string): MergeRequest {
     return {
-      id: mr.id?.toString() || mr.iid?.toString() || '',
-      number: mr.number || mr.iid || mr.id || 0,
-      title: mr.title || '',
-      description: mr.body || mr.description || '',
-      state: this.normalizeState(mr.state || mr.status),
-      author: mr.user?.login || mr.author?.username || mr.author?.name || '',
-      sourceBranch: mr.head?.ref || mr.source_branch || mr.head_branch || '',
-      targetBranch: mr.base?.ref || mr.target_branch || mr.base_branch || '',
-      url: mr.html_url || mr.web_url || mr.url || '',
-      draft: mr.draft || mr.work_in_progress || false,
-      mergeable: mr.mergeable,
+      id:
+        typeof mr.id === 'string' || typeof mr.id === 'number'
+          ? String(mr.id)
+          : typeof mr.iid === 'string' || typeof mr.iid === 'number'
+            ? String(mr.iid)
+            : '',
+      number:
+        typeof mr.number === 'number'
+          ? mr.number
+          : typeof mr.iid === 'number'
+            ? mr.iid
+            : typeof mr.id === 'number'
+              ? mr.id
+              : 0,
+      title: typeof mr.title === 'string' ? mr.title : '',
+      description:
+        typeof mr.body === 'string'
+          ? mr.body
+          : typeof mr.description === 'string'
+            ? mr.description
+            : '',
+      state: this.normalizeState(
+        typeof mr.state === 'string' ? mr.state : typeof mr.status === 'string' ? mr.status : '',
+      ),
+      author:
+        typeof mr.user === 'object' &&
+        mr.user &&
+        typeof (mr.user as Record<string, unknown>).login === 'string'
+          ? ((mr.user as Record<string, unknown>).login as string)
+          : typeof mr.author === 'object' &&
+              mr.author &&
+              typeof (mr.author as Record<string, unknown>).username === 'string'
+            ? ((mr.author as Record<string, unknown>).username as string)
+            : typeof mr.author === 'object' &&
+                mr.author &&
+                typeof (mr.author as Record<string, unknown>).name === 'string'
+              ? ((mr.author as Record<string, unknown>).name as string)
+              : '',
+      sourceBranch:
+        typeof mr.head === 'object' &&
+        mr.head &&
+        typeof (mr.head as Record<string, unknown>).ref === 'string'
+          ? ((mr.head as Record<string, unknown>).ref as string)
+          : typeof mr.source_branch === 'string'
+            ? mr.source_branch
+            : typeof mr.head_branch === 'string'
+              ? mr.head_branch
+              : '',
+      targetBranch:
+        typeof mr.base === 'object' &&
+        mr.base &&
+        typeof (mr.base as Record<string, unknown>).ref === 'string'
+          ? ((mr.base as Record<string, unknown>).ref as string)
+          : typeof mr.target_branch === 'string'
+            ? mr.target_branch
+            : typeof mr.base_branch === 'string'
+              ? mr.base_branch
+              : '',
+      url:
+        typeof mr.html_url === 'string'
+          ? mr.html_url
+          : typeof mr.web_url === 'string'
+            ? mr.web_url
+            : typeof mr.url === 'string'
+              ? mr.url
+              : '',
+      draft: Boolean(mr.draft ?? mr.work_in_progress ?? false),
+      mergeable: mr.mergeable as boolean | undefined,
       provider: provider,
-      createdAt: mr.created_at || mr.createdAt,
-      updatedAt: mr.updated_at || mr.updatedAt,
-      mergedAt: mr.merged_at || mr.merged_at || mr.mergedAt,
+      createdAt: (mr.created_at as string | undefined) ?? (mr.createdAt as string | undefined),
+      updatedAt: (mr.updated_at as string | undefined) ?? (mr.updatedAt as string | undefined),
+      mergedAt: (mr.merged_at as string | undefined) ?? (mr.mergedAt as string | undefined),
     };
   }
 
   private normalizeState(state: string): 'open' | 'closed' | 'merged' {
-    const lowState = state?.toLowerCase() || '';
+    const lowState = state?.toLowerCase() ?? '';
     if (lowState === 'merged') return 'merged';
     if (lowState === 'closed') return 'closed';
     return 'open';

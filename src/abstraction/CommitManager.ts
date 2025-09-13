@@ -121,7 +121,7 @@ export class CommitManager {
             const parsedCommits: unknown = JSON.parse(commitsJson);
 
             if (Array.isArray(parsedCommits)) {
-              return parsedCommits.map((commit: any) => this.normalizeCommit(commit, provider));
+              return parsedCommits.map((commit: unknown) => this.normalizeCommit(commit as ProviderCommit, provider));
             }
           }
         } catch (error) {
@@ -268,25 +268,76 @@ export class CommitManager {
       };
     } else {
       // Fallback for generic Record<string, unknown>
-      const genericCommit = commit as Record<string, any>;
+      const genericCommit = commit;
       return {
-        sha: genericCommit.sha || genericCommit.id || '',
-        message: genericCommit.message || genericCommit.title || '',
+        sha:
+          typeof genericCommit.sha === 'string'
+            ? genericCommit.sha
+            : typeof genericCommit.id === 'string'
+              ? genericCommit.id
+              : '',
+        message:
+          typeof genericCommit.message === 'string'
+            ? genericCommit.message
+            : typeof genericCommit.title === 'string'
+              ? genericCommit.title
+              : '',
         author: {
-          name: genericCommit.author_name || genericCommit.author?.name || '',
-          email: genericCommit.author_email || genericCommit.author?.email || '',
-          date: genericCommit.authored_date || genericCommit.created_at || '',
+          name:
+            typeof genericCommit.author_name === 'string'
+              ? genericCommit.author_name
+              : typeof genericCommit.author === 'object' &&
+                  genericCommit.author &&
+                  typeof (genericCommit.author as Record<string, unknown>).name === 'string'
+                ? ((genericCommit.author as Record<string, unknown>).name as string)
+                : '',
+          email:
+            typeof genericCommit.author_email === 'string'
+              ? genericCommit.author_email
+              : typeof genericCommit.author === 'object' &&
+                  genericCommit.author &&
+                  typeof (genericCommit.author as Record<string, unknown>).email === 'string'
+                ? ((genericCommit.author as Record<string, unknown>).email as string)
+                : '',
+          date:
+            typeof genericCommit.authored_date === 'string'
+              ? genericCommit.authored_date
+              : typeof genericCommit.created_at === 'string'
+                ? genericCommit.created_at
+                : '',
         },
-        committer: genericCommit.committer_name
-          ? {
-              name: genericCommit.committer_name || '',
-              email: genericCommit.committer_email || '',
-              date: genericCommit.committed_date || '',
-            }
-          : undefined,
-        url: genericCommit.html_url || genericCommit.web_url || '',
-        additions: genericCommit.stats?.additions,
-        deletions: genericCommit.stats?.deletions,
+        committer:
+          typeof genericCommit.committer_name === 'string'
+            ? {
+                name: genericCommit.committer_name,
+                email:
+                  typeof genericCommit.committer_email === 'string'
+                    ? genericCommit.committer_email
+                    : '',
+                date:
+                  typeof genericCommit.committed_date === 'string'
+                    ? genericCommit.committed_date
+                    : '',
+              }
+            : undefined,
+        url:
+          typeof genericCommit.html_url === 'string'
+            ? genericCommit.html_url
+            : typeof genericCommit.web_url === 'string'
+              ? genericCommit.web_url
+              : '',
+        additions:
+          typeof genericCommit.stats === 'object' &&
+          genericCommit.stats &&
+          typeof (genericCommit.stats as Record<string, unknown>).additions === 'number'
+            ? ((genericCommit.stats as Record<string, unknown>).additions as number)
+            : undefined,
+        deletions:
+          typeof genericCommit.stats === 'object' &&
+          genericCommit.stats &&
+          typeof (genericCommit.stats as Record<string, unknown>).deletions === 'number'
+            ? ((genericCommit.stats as Record<string, unknown>).deletions as number)
+            : undefined,
         files: undefined,
         provider,
       };
@@ -294,7 +345,7 @@ export class CommitManager {
   }
 
   private normalizeFileStatus(status: string): 'added' | 'modified' | 'removed' | 'renamed' {
-    const lowStatus = status?.toLowerCase() || '';
+    const lowStatus = status?.toLowerCase() ?? '';
     if (['added', 'new'].includes(lowStatus)) return 'added';
     if (['modified', 'changed'].includes(lowStatus)) return 'modified';
     if (['removed', 'deleted'].includes(lowStatus)) return 'removed';

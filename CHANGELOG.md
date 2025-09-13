@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.0...v1.5.1) (2025-09-13)
+
+
+### Bug Fixes
+
+* replace npx with yarn dlx to resolve npm/yarn conflicts ([0bbaf98](https://github.com/structured-world/project-nexus-mcp/commit/0bbaf98f654eb7b1a6858aaee4065aa0e8f0c5fe))
+
 # [1.5.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.4.0...v1.5.0) (2025-09-13)
 
 

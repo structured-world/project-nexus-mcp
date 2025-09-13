@@ -16,3 +16,7 @@ PROVIDERS.md
 dist/
 test-server.sh
 .yarn
+
+# Test coverage reports (published to GitHub Pages instead)
+coverage/
+*.lcov

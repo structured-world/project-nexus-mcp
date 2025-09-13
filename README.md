@@ -4,6 +4,7 @@
 ![npm downloads](https://img.shields.io/npm/dm/@structured-world/project-nexus-mcp)
 ![Release](https://github.com/structured-world/project-nexus-mcp/workflows/Release/badge.svg)
 ![Codecov](https://codecov.io/gh/structured-world/project-nexus-mcp/branch/main/graph/badge.svg)
+[![Coverage Report](https://img.shields.io/badge/Coverage-Live%20Report-brightgreen?logo=github)](https://structured-world.github.io/project-nexus-mcp/coverage/)
 
 Project Nexus is a Model Context Protocol (MCP) server that provides fine-grained, unified access to your development tasks, source code, and CI/CD pipelines across multiple platforms. It enables AI assistants to seamlessly interact with GitLab, GitHub, Azure DevOps, and more through one unified interface.
 
@@ -215,6 +216,43 @@ With this setup, GitHub Copilot’s AI can leverage Project Nexus to access your
 
 ## Roadmap
 See the [Roadmap](./ROADMAP.md) for upcoming features and plans.
+
+## Testing & Coverage
+
+Project Nexus includes comprehensive test coverage to ensure reliability and maintainability.
+
+### Running Tests
+
+```bash
+# Run all tests
+yarn test
+
+# Run tests with coverage
+yarn test:cov
+
+# Run tests in watch mode
+yarn test:watch
+```
+
+### Coverage Reports
+
+Test coverage reports are automatically generated and published to GitHub Pages:
+
+📊 **[Live Coverage Report](https://structured-world.github.io/project-nexus-mcp/coverage/)** - Interactive HTML coverage report
+
+The coverage reports include:
+- **Statement coverage** - Which lines of code are executed
+- **Branch coverage** - Which code branches are tested
+- **Function coverage** - Which functions are called
+- **Line coverage** - Overall line-by-line coverage
+
+Coverage is also reported to [Codecov](https://codecov.io/gh/structured-world/project-nexus-mcp) for trend analysis and PR integration.
+
+### Coverage Goals
+
+- **Target**: 80%+ overall coverage
+- **Critical paths**: 95%+ coverage for core functionality
+- **New features**: Must include comprehensive tests
 
 ## Contributing
 See the [Contributing Guide](./CONTRIBUTING.md) for how to get involved.

@@ -2,14 +2,18 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
-import { ProviderConfig, ProviderInstance } from '../types/index.js';
+import { ProviderConfig, ProviderInstance, QueuedRequest } from '../types/index.js';
 import { classifyError, shouldAttemptReconnection } from '../utils/errorClassifier.js';
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 
 export class ProviderManager extends EventEmitter {
   private providers: Map<string, ProviderInstance> = new Map();
   private updateCheckInterval?: NodeJS.Timeout;
   private reconnectionTimers: Map<string, NodeJS.Timeout> = new Map();
+
+  // Request queuing constants
+  private static readonly REQUEST_TIMEOUT_MS = 30000; // 30 seconds
 
   async initializeProvider(config: ProviderConfig): Promise<ProviderInstance> {
     // Validate tokens before attempting to initialize
@@ -41,6 +45,8 @@ export class ProviderManager extends EventEmitter {
       status: 'starting',
       reconnectAttempts: 0,
       lastUpdated: new Date(),
+      isUpdating: false,
+      requestQueue: [],
     };
 
     try {
@@ -219,18 +225,49 @@ export class ProviderManager extends EventEmitter {
 
     process.stdout.write(`Reloading provider: ${providerId}\n`);
 
-    await this.disconnectProvider(providerId);
+    // Set updating state to queue incoming requests
+    await this.setProviderUpdating(providerId, true);
 
-    // Reset reconnection attempts when manually reloading
-    existingProvider.reconnectAttempts = 0;
-    existingProvider.lastReconnectTime = undefined;
-    existingProvider.error = undefined;
-    existingProvider.errorType = undefined;
-    existingProvider.shouldReconnect = undefined;
+    try {
+      await this.disconnectProvider(providerId);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Reset reconnection attempts when manually reloading
+      existingProvider.reconnectAttempts = 0;
+      existingProvider.lastReconnectTime = undefined;
+      existingProvider.error = undefined;
+      existingProvider.errorType = undefined;
+      existingProvider.shouldReconnect = undefined;
 
-    await this.initializeProvider(existingProvider.config);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      await this.initializeProvider(existingProvider.config);
+
+      // Clear updating state and process queued requests
+      await this.setProviderUpdating(providerId, false);
+    } catch (error) {
+      // If reload failed, still clear updating state but don't process queue
+      const provider = this.providers.get(providerId);
+      if (provider) {
+        provider.isUpdating = false;
+        provider.status = 'error';
+        provider.updateStartTime = undefined;
+        // Clear the request queue with errors
+        if (provider.requestQueue) {
+          for (const request of provider.requestQueue) {
+            if (request.timeoutId) {
+              clearTimeout(request.timeoutId);
+            }
+            request.reject(
+              new Error(
+                `Provider reload failed: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+            );
+          }
+          provider.requestQueue = [];
+        }
+      }
+      throw error;
+    }
   }
 
   async disconnectProvider(providerId: string): Promise<void> {
@@ -296,8 +333,20 @@ export class ProviderManager extends EventEmitter {
     const originalToolName = toolName.substring(providerId.length + 1);
 
     const provider = this.providers.get(providerId);
-    if (!provider || provider.status !== 'connected') {
-      throw new Error(`Provider ${providerId} not available`);
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not found`);
+    }
+
+    // If provider is updating, queue the request
+    if (provider.isUpdating || provider.status === 'updating') {
+      return this.queueRequest(provider, 'tool', {
+        name: originalToolName,
+        arguments: args,
+      });
+    }
+
+    if (provider.status !== 'connected') {
+      throw new Error(`Provider ${providerId} not available (status: ${provider.status})`);
     }
 
     if (!provider.client) {
@@ -324,8 +373,19 @@ export class ProviderManager extends EventEmitter {
     const originalUri = uri.substring(providerId.length + 1);
 
     const provider = this.providers.get(providerId);
-    if (!provider || provider.status !== 'connected') {
-      throw new Error(`Provider ${providerId} not available`);
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not found`);
+    }
+
+    // If provider is updating, queue the request
+    if (provider.isUpdating || provider.status === 'updating') {
+      return this.queueRequest(provider, 'resource', {
+        uri: originalUri,
+      });
+    }
+
+    if (provider.status !== 'connected') {
+      throw new Error(`Provider ${providerId} not available (status: ${provider.status})`);
     }
 
     if (!provider.client) {
@@ -351,8 +411,20 @@ export class ProviderManager extends EventEmitter {
     const originalPromptName = promptName.substring(providerId.length + 1);
 
     const provider = this.providers.get(providerId);
-    if (!provider || provider.status !== 'connected') {
-      throw new Error(`Provider ${providerId} not available`);
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not found`);
+    }
+
+    // If provider is updating, queue the request
+    if (provider.isUpdating || provider.status === 'updating') {
+      return this.queueRequest(provider, 'prompt', {
+        name: originalPromptName,
+        arguments: args,
+      });
+    }
+
+    if (provider.status !== 'connected') {
+      throw new Error(`Provider ${providerId} not available (status: ${provider.status})`);
     }
 
     if (!provider.client) {
@@ -585,6 +657,181 @@ export class ProviderManager extends EventEmitter {
     } catch {
       // Transport monitoring not available, that's okay
       process.stderr.write(`Transport monitoring not available for ${instance.id}\n`);
+    }
+  }
+
+  /**
+   * Queue a request during provider update
+   */
+  private async queueRequest(
+    provider: ProviderInstance,
+    type: 'tool' | 'resource' | 'prompt',
+    data: {
+      name?: string;
+      uri?: string;
+      arguments?: Record<string, unknown>;
+    },
+  ): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const requestId = randomUUID();
+      const queuedRequest: QueuedRequest = {
+        id: requestId,
+        type,
+        data,
+        resolve,
+        reject,
+        timestamp: new Date(),
+      };
+
+      // Initialize queue if not exists
+      provider.requestQueue ??= [];
+
+      provider.requestQueue.push(queuedRequest);
+
+      process.stderr.write(
+        `Request queued for provider ${provider.id} (${type}): ${data.name ?? data.uri ?? 'prompt'}\n`,
+      );
+
+      // Set timeout for the request
+      const timeoutId = setTimeout(() => {
+        // Remove from queue and reject with timeout error
+        if (provider.requestQueue) {
+          const index = provider.requestQueue.findIndex((req) => req.id === requestId);
+          if (index !== -1) {
+            provider.requestQueue.splice(index, 1);
+            reject(
+              new Error(
+                `Request timed out after ${ProviderManager.REQUEST_TIMEOUT_MS}ms while provider ${provider.id} was updating`,
+              ),
+            );
+          }
+        }
+      }, ProviderManager.REQUEST_TIMEOUT_MS);
+
+      // Store timeout ID in the request for cleanup
+      queuedRequest.timeoutId = timeoutId;
+    });
+  }
+
+  /**
+   * Process queued requests after provider is back online
+   */
+  private async processQueuedRequests(provider: ProviderInstance): Promise<void> {
+    if (!provider.requestQueue || provider.requestQueue.length === 0) {
+      return;
+    }
+
+    process.stderr.write(
+      `Processing ${provider.requestQueue.length} queued requests for provider ${provider.id}\n`,
+    );
+
+    const requestsToProcess = [...provider.requestQueue];
+    provider.requestQueue = []; // Clear queue
+
+    for (const request of requestsToProcess) {
+      // Clear timeout
+      if (request.timeoutId) {
+        clearTimeout(request.timeoutId);
+      }
+
+      try {
+        let result: unknown;
+
+        switch (request.type) {
+          case 'tool':
+            if (request.data.name && provider.client) {
+              result = await provider.client.callTool({
+                name: request.data.name,
+                arguments: request.data.arguments ?? {},
+              });
+            }
+            break;
+          case 'resource':
+            if (request.data.uri && provider.client) {
+              result = await provider.client.readResource({
+                uri: request.data.uri,
+              });
+            }
+            break;
+          case 'prompt':
+            if (request.data.name && provider.client) {
+              const promptArgs: Record<string, string> | undefined = request.data.arguments
+                ? Object.fromEntries(
+                    Object.entries(request.data.arguments).map(([key, value]) => [
+                      key,
+                      typeof value === 'string'
+                        ? value
+                        : value === null || value === undefined
+                          ? ''
+                          : typeof value === 'object'
+                            ? JSON.stringify(value)
+                            : typeof value === 'number' || typeof value === 'boolean'
+                              ? String(value)
+                              : '',
+                    ]),
+                  )
+                : undefined;
+
+              result = await provider.client.getPrompt({
+                name: request.data.name,
+                arguments: promptArgs,
+              });
+            }
+            break;
+        }
+
+        request.resolve(result);
+      } catch (error) {
+        request.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+  }
+
+  /**
+   * Set provider updating state and queue incoming requests
+   */
+  async setProviderUpdating(providerId: string, updating: boolean): Promise<void> {
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      return;
+    }
+
+    provider.isUpdating = updating;
+    provider.status = updating ? 'updating' : 'connected';
+
+    if (updating) {
+      provider.updateStartTime = new Date();
+      process.stderr.write(`Provider ${providerId} is now updating - queueing new requests\n`);
+    } else {
+      provider.updateStartTime = undefined;
+      process.stderr.write(`Provider ${providerId} update complete - processing queued requests\n`);
+      await this.processQueuedRequests(provider);
+    }
+  }
+
+  /**
+   * Restart all providers (for debugging)
+   */
+  async restartAllProviders(): Promise<void> {
+    process.stderr.write(`Restarting all ${this.providers.size} providers...\n`);
+
+    const providerIds = Array.from(this.providers.keys());
+    const results = await Promise.allSettled(
+      providerIds.map((providerId) => this.reloadProvider(providerId)),
+    );
+
+    const successful = results.filter((result) => result.status === 'fulfilled').length;
+    const failed = results.length - successful;
+
+    process.stderr.write(`Provider restart complete: ${successful} successful, ${failed} failed\n`);
+
+    if (failed > 0) {
+      const failures = results
+        .map((result, index) => ({ result, id: providerIds[index] }))
+        .filter(({ result }) => result.status === 'rejected')
+        .map(({ result, id }) => `${id}: ${(result as PromiseRejectedResult).reason}`);
+
+      process.stderr.write(`Failed providers:\n${failures.join('\n')}\n`);
     }
   }
 

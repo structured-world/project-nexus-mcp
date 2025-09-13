@@ -26,6 +26,21 @@ export interface NexusConfig {
   defaultTask?: string;
 }
 
+// Request queuing interfaces
+export interface QueuedRequest {
+  id: string;
+  type: 'tool' | 'resource' | 'prompt';
+  data: {
+    name?: string;
+    uri?: string;
+    arguments?: Record<string, unknown>;
+  };
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timestamp: Date;
+  timeoutId?: NodeJS.Timeout;
+}
+
 export interface ProviderInstance {
   id: string;
   config: ProviderConfig;
@@ -33,13 +48,17 @@ export interface ProviderInstance {
   tools: Map<string, Tool>;
   resources: Map<string, Resource>;
   prompts: Map<string, Prompt>;
-  status: 'starting' | 'connected' | 'disconnected' | 'error' | 'auth_failed';
+  status: 'starting' | 'connected' | 'disconnected' | 'error' | 'auth_failed' | 'updating';
   error?: string;
   errorType?: 'auth' | 'network' | 'config' | 'unknown';
   shouldReconnect?: boolean;
   reconnectAttempts?: number;
   lastReconnectTime?: Date;
   lastUpdated?: Date;
+  // New fields for update management
+  isUpdating?: boolean;
+  updateStartTime?: Date;
+  requestQueue?: QueuedRequest[];
 }
 
 // Enhanced WorkItem interface as per PROVIDERS.md

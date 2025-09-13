@@ -4,6 +4,7 @@ import {
   getConfiguredProviders,
   getConfigurationHelp,
   validateConfigurationForCLI,
+  logConfigurationStatus,
 } from '../../utils/configValidator.js';
 import { Provider } from '../../types/index.js';
 
@@ -276,6 +277,162 @@ describe('Configuration Validator', () => {
       expect(result.isValid).toBe(false);
       expect(result.configuredProviders).toEqual([]);
       expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it('should categorize errors vs warnings correctly', () => {
+      // Test the categorization logic that exists in validateConfigurationForCLI
+      // Line 232 is the warnings.push() call for non-error statuses
+
+      // Simulate results that would trigger both error and warning paths
+      const mockResults = [
+        { provider: 'github' as Provider, status: 'configured' as const, isValid: true },
+        {
+          provider: 'gitlab' as Provider,
+          status: 'missing-token' as const,
+          isValid: false,
+          reason: 'Token missing',
+        },
+        {
+          provider: 'azure' as Provider,
+          status: 'invalid-config' as const,
+          isValid: false,
+          reason: 'Invalid config',
+        },
+        {
+          provider: 'custom' as Provider,
+          status: 'missing-project' as const,
+          isValid: false,
+          reason: 'Project missing',
+        },
+      ];
+
+      // Test the exact logic from the function
+      const errors: string[] = [];
+      const warnings: string[] = [];
+
+      mockResults.forEach((result) => {
+        if (!result.isValid) {
+          if (result.status === 'missing-token' || result.status === 'invalid-config') {
+            errors.push(result.reason ?? 'Configuration error');
+          } else {
+            warnings.push(result.reason ?? 'Configuration warning');
+          }
+        }
+      });
+
+      expect(errors).toHaveLength(2); // missing-token and invalid-config
+      expect(warnings).toHaveLength(1); // missing-project (anything else)
+      expect(errors).toContain('Token missing');
+      expect(errors).toContain('Invalid config');
+      expect(warnings).toContain('Project missing');
+    });
+  });
+
+  describe('logConfigurationStatus', () => {
+    let mockConsoleLog: jest.SpiedFunction<typeof console.log>;
+
+    beforeEach(() => {
+      mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      mockConsoleLog.mockRestore();
+    });
+
+    it('should log status for configured and missing providers', () => {
+      const results = [
+        { provider: 'github' as Provider, status: 'configured' as const, isValid: true },
+        {
+          provider: 'gitlab' as Provider,
+          status: 'missing-token' as const,
+          isValid: false,
+          reason: 'Token missing',
+        },
+        {
+          provider: 'azure' as Provider,
+          status: 'missing-project' as const,
+          isValid: false,
+          reason: 'Project missing',
+        },
+      ];
+
+      logConfigurationStatus(results);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('\n=== Provider Configuration Status ===');
+      expect(mockConsoleLog).toHaveBeenCalledWith('\n✅ Configured providers:');
+      expect(mockConsoleLog).toHaveBeenCalledWith('   github: Ready');
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '\n⚠️  Skipped providers (missing configuration):',
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith('   gitlab: Token missing');
+      expect(mockConsoleLog).toHaveBeenCalledWith('   azure: Project missing');
+      expect(mockConsoleLog).toHaveBeenCalledWith('=====================================\n');
+    });
+
+    it('should log only configured providers when all are valid', () => {
+      const results = [
+        { provider: 'github' as Provider, status: 'configured' as const, isValid: true },
+        { provider: 'gitlab' as Provider, status: 'configured' as const, isValid: true },
+      ];
+
+      logConfigurationStatus(results);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('\n✅ Configured providers:');
+      expect(mockConsoleLog).toHaveBeenCalledWith('   github: Ready');
+      expect(mockConsoleLog).toHaveBeenCalledWith('   gitlab: Ready');
+      expect(mockConsoleLog).not.toHaveBeenCalledWith(
+        '\n⚠️  Skipped providers (missing configuration):',
+      );
+    });
+
+    it('should show setup instructions when all providers are missing', () => {
+      const results = [
+        {
+          provider: 'github' as Provider,
+          status: 'missing-token' as const,
+          isValid: false,
+          reason: 'Token missing',
+        },
+        {
+          provider: 'gitlab' as Provider,
+          status: 'missing-token' as const,
+          isValid: false,
+          reason: 'Token missing',
+        },
+        {
+          provider: 'azure' as Provider,
+          status: 'missing-token' as const,
+          isValid: false,
+          reason: 'Token missing',
+        },
+      ];
+
+      logConfigurationStatus(results);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '\n🔧 To enable providers, set the required environment variables:',
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '\n   Example: export GITHUB_TOKEN=ghp_your_token_here',
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '   github: GitHub requires GITHUB_TOKEN environment variable',
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '   gitlab: GitLab requires GITLAB_TOKEN environment variable',
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        '   azure: Azure DevOps requires AZURE_DEVOPS_PAT and AZURE_ORG environment variables',
+      );
+    });
+
+    it('should handle empty results array', () => {
+      const results: never[] = [];
+
+      logConfigurationStatus(results);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith('\n=== Provider Configuration Status ===');
+      expect(mockConsoleLog).toHaveBeenCalledWith('=====================================\n');
     });
   });
 

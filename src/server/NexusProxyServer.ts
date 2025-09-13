@@ -295,13 +295,67 @@ export class NexusProxyServer {
         };
       }
 
+      case 'nexus_restart_all_providers': {
+        // Check if debug tools are enabled
+        if (process.env.NEXUS_DEBUG_TOOLS !== 'true') {
+          throw new Error('Debug tools are not enabled. Set NEXUS_DEBUG_TOOLS=true to enable.');
+        }
+
+        await this.providerManager.restartAllProviders();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'All providers have been restarted',
+            },
+          ],
+        };
+      }
+
+      case 'nexus_exit_server': {
+        // Check if debug tools are enabled
+        if (process.env.NEXUS_DEBUG_TOOLS !== 'true') {
+          throw new Error('Debug tools are not enabled. Set NEXUS_DEBUG_TOOLS=true to enable.');
+        }
+
+        // Initiate graceful shutdown
+        process.stderr.write('Debug exit requested - shutting down server...\n');
+
+        // Return response first
+        const response = {
+          content: [
+            {
+              type: 'text',
+              text: 'Server shutdown initiated',
+            },
+          ],
+        };
+
+        // Schedule shutdown after response is sent
+        setTimeout(() => {
+          void (async () => {
+            try {
+              await this.shutdown();
+              process.exit(0);
+            } catch (error) {
+              process.stderr.write(
+                `Error during shutdown: ${error instanceof Error ? error.message : String(error)}\n`,
+              );
+              process.exit(1);
+            }
+          })();
+        }, 100);
+
+        return response;
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   }
 
   private createAdditionalTools(): Tool[] {
-    return [
+    const tools: Tool[] = [
       {
         name: 'nexus_reload_provider',
         description: 'Reload a specific provider (useful for updating to new versions)',
@@ -325,6 +379,30 @@ export class NexusProxyServer {
         },
       },
     ];
+
+    // Add debug tools only if environment variable is set
+    if (process.env.NEXUS_DEBUG_TOOLS === 'true') {
+      tools.push(
+        {
+          name: 'nexus_restart_all_providers',
+          description: '[DEBUG] Restart all child MCP server providers',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'nexus_exit_server',
+          description: '[DEBUG] Shut down the Nexus proxy server (allows restart from Claude Code)',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+      );
+    }
+
+    return tools;
   }
 
   async loadConfig(configPath?: string): Promise<void> {
@@ -537,7 +615,7 @@ export class NexusProxyServer {
     // Print final status
     this.printProviderStatus();
 
-    this.providerManager.startAutoUpdate(60000);
+    this.providerManager.startAutoUpdate(3600000); // 1 hour
   }
 
   async runStdio(): Promise<void> {

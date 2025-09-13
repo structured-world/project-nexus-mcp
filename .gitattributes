@@ -1,7 +1,6 @@
 # Git attributes for Project Nexus MCP
 
-# Exclude coverage reports from language detection
-coverage/** linguist-generated=true
+# Coverage reports are generated dynamically in CI/CD and not committed to repo
 
 # Mark test files as test code
 **/*.test.ts linguist-language=TypeScript

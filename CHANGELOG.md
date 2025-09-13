@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.1...v1.3.2) (2025-09-13)
+
+
+### Bug Fixes
+
+* resolve GitHub Actions workflow issues and language detection ([1606005](https://github.com/structured-world/project-nexus-mcp/commit/160600582a76f7ea777b9988c3488abe9e3023a3))
+
 ## [1.3.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.0...v1.3.1) (2025-09-13)
 
 

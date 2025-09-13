@@ -138,14 +138,22 @@ describe('NexusProxyServer', () => {
         const handler = handlers.get(ListToolsRequestSchema);
         const result = await handler({ params: {} });
 
-        expect(result.tools).toHaveLength(4); // 1 provider + 1 unified + 2 additional
-        expect(result.tools).toContainEqual(expect.objectContaining({ name: 'provider_tool' }));
+        expect(result.tools).toHaveLength(36); // All unified tools from managers + management tools
+
+        // Should contain unified nexus tools only (provider tools are hidden)
         expect(result.tools).toContainEqual(
           expect.objectContaining({ name: 'nexus_list_work_items' }),
         );
         expect(result.tools).toContainEqual(
           expect.objectContaining({ name: 'nexus_reload_provider' }),
         );
+        expect(result.tools).toContainEqual(
+          expect.objectContaining({ name: 'nexus_provider_status' }),
+        );
+
+        // Should NOT contain provider-specific tools (they are hidden)
+        const hasProviderTool = result.tools.some((tool: { name: string }) => tool.name === 'provider_tool');
+        expect(hasProviderTool).toBe(false);
       });
     });
 

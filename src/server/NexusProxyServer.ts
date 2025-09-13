@@ -11,6 +11,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ProviderManager } from '../providers/ProviderManager.js';
 import { WorkItemsManager } from '../abstraction/WorkItemsManager.js';
+import { RepositoryManager } from '../abstraction/RepositoryManager.js';
+import { ProjectManager } from '../abstraction/ProjectManager.js';
+import { MergeRequestManager } from '../abstraction/MergeRequestManager.js';
+import { PipelineManager } from '../abstraction/PipelineManager.js';
+import { SearchManager } from '../abstraction/SearchManager.js';
+import { BranchManager } from '../abstraction/BranchManager.js';
+import { CommitManager } from '../abstraction/CommitManager.js';
 import { NexusConfig, ProviderInstance } from '../types/index.js';
 import { createServer } from 'http';
 import express from 'express';
@@ -20,6 +27,13 @@ export class NexusProxyServer {
   private server: Server;
   private providerManager: ProviderManager;
   private workItemsManager: WorkItemsManager;
+  private repositoryManager: RepositoryManager;
+  private projectManager: ProjectManager;
+  private mergeRequestManager: MergeRequestManager;
+  private pipelineManager: PipelineManager;
+  private searchManager: SearchManager;
+  private branchManager: BranchManager;
+  private commitManager: CommitManager;
   private config: NexusConfig;
   private httpServer?: ReturnType<typeof createServer>;
   private expressApp?: express.Application;
@@ -42,6 +56,13 @@ export class NexusProxyServer {
 
     this.providerManager = new ProviderManager();
     this.workItemsManager = new WorkItemsManager(this.providerManager);
+    this.repositoryManager = new RepositoryManager(this.providerManager);
+    this.projectManager = new ProjectManager(this.providerManager);
+    this.mergeRequestManager = new MergeRequestManager(this.providerManager);
+    this.pipelineManager = new PipelineManager(this.providerManager);
+    this.searchManager = new SearchManager(this.providerManager);
+    this.branchManager = new BranchManager(this.providerManager);
+    this.commitManager = new CommitManager(this.providerManager);
 
     this.config = {
       providers: [],
@@ -54,12 +75,29 @@ export class NexusProxyServer {
 
   private setupHandlers(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, () => {
-      const providerTools = this.providerManager.getAllTools();
-      const unifiedTools = this.workItemsManager.createUnifiedTools();
+      // DO NOT expose provider tools - only unified nexus_* tools
+      const workItemTools = this.workItemsManager.createUnifiedTools();
+      const repositoryTools = this.repositoryManager.createUnifiedTools();
+      const projectTools = this.projectManager.createUnifiedTools();
+      const mergeRequestTools = this.mergeRequestManager.createUnifiedTools();
+      const pipelineTools = this.pipelineManager.createUnifiedTools();
+      const searchTools = this.searchManager.createUnifiedTools();
+      const branchTools = this.branchManager.createUnifiedTools();
+      const commitTools = this.commitManager.createUnifiedTools();
       const additionalTools = this.createAdditionalTools();
 
       return {
-        tools: [...providerTools, ...unifiedTools, ...additionalTools],
+        tools: [
+          ...workItemTools,
+          ...repositoryTools,
+          ...projectTools,
+          ...mergeRequestTools,
+          ...pipelineTools,
+          ...searchTools,
+          ...branchTools,
+          ...commitTools,
+          ...additionalTools,
+        ],
       };
     });
 
@@ -248,6 +286,167 @@ export class NexusProxyServer {
             {
               type: 'text',
               text: JSON.stringify(transferred, null, 2),
+            },
+          ],
+        };
+      }
+
+      // Repository Manager Tools
+      case 'nexus_list_repositories': {
+        const project = typeof args.project === 'string' ? args.project : undefined;
+        const repositories = await this.repositoryManager.listRepositories(project, args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(repositories, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_get_repository': {
+        if (typeof args.project !== 'string' || typeof args.repository !== 'string') {
+          throw new Error('project and repository parameters must be strings');
+        }
+        const repository = await this.repositoryManager.getRepository(
+          args.project,
+          args.repository,
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(repository, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_list_files': {
+        if (typeof args.project !== 'string' || typeof args.repository !== 'string') {
+          throw new Error('project and repository parameters must be strings');
+        }
+        const path = typeof args.path === 'string' ? args.path : '';
+        const ref = typeof args.ref === 'string' ? args.ref : undefined;
+        const files = await this.repositoryManager.listFiles(
+          args.project,
+          args.repository,
+          path,
+          ref,
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(files, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_get_file_content': {
+        if (
+          typeof args.project !== 'string' ||
+          typeof args.repository !== 'string' ||
+          typeof args.file_path !== 'string'
+        ) {
+          throw new Error('project, repository, and file_path parameters must be strings');
+        }
+        const ref = typeof args.ref === 'string' ? args.ref : undefined;
+        const content = await this.repositoryManager.getFileContent(
+          args.project,
+          args.repository,
+          args.file_path,
+          ref,
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(content, null, 2),
+            },
+          ],
+        };
+      }
+
+      // Project Manager Tools
+      case 'nexus_list_projects': {
+        const provider = typeof args.provider === 'string' ? args.provider : undefined;
+        const projects = await this.projectManager.listProjects(provider, args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(projects, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_get_project': {
+        if (typeof args.project !== 'string') {
+          throw new Error('project parameter must be a string');
+        }
+        const project = await this.projectManager.getProject(args.project);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(project, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_list_project_members': {
+        if (typeof args.project !== 'string') {
+          throw new Error('project parameter must be a string');
+        }
+        const members = await this.projectManager.listProjectMembers(args.project);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(members, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_add_project_member': {
+        if (
+          typeof args.project !== 'string' ||
+          typeof args.username !== 'string' ||
+          typeof args.role !== 'string'
+        ) {
+          throw new Error('project, username, and role parameters must be strings');
+        }
+        const added = await this.projectManager.addProjectMember(
+          args.project,
+          args.username,
+          args.role,
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ success: added }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_remove_project_member': {
+        if (typeof args.project !== 'string' || typeof args.username !== 'string') {
+          throw new Error('project and username parameters must be strings');
+        }
+        const removed = await this.projectManager.removeProjectMember(args.project, args.username);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ success: removed }, null, 2),
             },
           ],
         };
@@ -640,12 +839,33 @@ export class NexusProxyServer {
       return;
     }
 
-    const unifiedTools = this.workItemsManager.createUnifiedTools();
+    // Get all unified tools from all managers
+    const workItemTools = this.workItemsManager.createUnifiedTools();
+    const repositoryTools = this.repositoryManager.createUnifiedTools();
+    const projectTools = this.projectManager.createUnifiedTools();
+    const mergeRequestTools = this.mergeRequestManager.createUnifiedTools();
+    const pipelineTools = this.pipelineManager.createUnifiedTools();
+    const searchTools = this.searchManager.createUnifiedTools();
+    const branchTools = this.branchManager.createUnifiedTools();
+    const commitTools = this.commitManager.createUnifiedTools();
+
+    const allUnifiedTools = [
+      ...workItemTools,
+      ...repositoryTools,
+      ...projectTools,
+      ...mergeRequestTools,
+      ...pipelineTools,
+      ...searchTools,
+      ...branchTools,
+      ...commitTools,
+    ];
+
     const unifiedToolPatterns = new Map<string, string>();
 
-    // Build unified tool pattern map
-    for (const tool of unifiedTools) {
+    // Build comprehensive unified tool pattern map
+    for (const tool of allUnifiedTools) {
       switch (tool.name) {
+        // Work Items
         case 'nexus_list_work_items':
           unifiedToolPatterns.set('list.*work.*item', 'nexus_list_work_items');
           unifiedToolPatterns.set('get.*work.*item', 'nexus_list_work_items');
@@ -655,6 +875,155 @@ export class NexusProxyServer {
         case 'nexus_create_work_item':
           unifiedToolPatterns.set('create.*work.*item', 'nexus_create_work_item');
           unifiedToolPatterns.set('create.*issue', 'nexus_create_work_item');
+          break;
+        case 'nexus_update_work_item':
+          unifiedToolPatterns.set('update.*work.*item', 'nexus_update_work_item');
+          unifiedToolPatterns.set('update.*issue', 'nexus_update_work_item');
+          break;
+        case 'nexus_transfer_work_item':
+          unifiedToolPatterns.set('transfer.*work.*item', 'nexus_transfer_work_item');
+          unifiedToolPatterns.set('move.*issue', 'nexus_transfer_work_item');
+          break;
+
+        // Repositories
+        case 'nexus_list_repositories':
+          unifiedToolPatterns.set('list.*repositor', 'nexus_list_repositories');
+          unifiedToolPatterns.set('get.*repositor', 'nexus_list_repositories');
+          unifiedToolPatterns.set('list.*repo', 'nexus_list_repositories');
+          unifiedToolPatterns.set('search.*repositor', 'nexus_list_repositories');
+          break;
+        case 'nexus_get_repository':
+          unifiedToolPatterns.set('get.*repository$', 'nexus_get_repository');
+          unifiedToolPatterns.set('get.*repo$', 'nexus_get_repository');
+          unifiedToolPatterns.set('repository.*info', 'nexus_get_repository');
+          break;
+        case 'nexus_list_files':
+          unifiedToolPatterns.set('list.*file', 'nexus_list_files');
+          unifiedToolPatterns.set('browse.*repo', 'nexus_list_files');
+          unifiedToolPatterns.set('get.*content.*list', 'nexus_list_files');
+          break;
+        case 'nexus_get_file_content':
+          unifiedToolPatterns.set('get.*file.*content', 'nexus_get_file_content');
+          unifiedToolPatterns.set('read.*file', 'nexus_get_file_content');
+          unifiedToolPatterns.set('get.*blob', 'nexus_get_file_content');
+          break;
+
+        // Projects
+        case 'nexus_list_projects':
+          unifiedToolPatterns.set('list.*project', 'nexus_list_projects');
+          unifiedToolPatterns.set('list.*organization', 'nexus_list_projects');
+          unifiedToolPatterns.set('list.*group', 'nexus_list_projects');
+          unifiedToolPatterns.set('list.*org', 'nexus_list_projects');
+          break;
+        case 'nexus_get_project':
+          unifiedToolPatterns.set('get.*project$', 'nexus_get_project');
+          unifiedToolPatterns.set('get.*organization$', 'nexus_get_project');
+          unifiedToolPatterns.set('get.*group$', 'nexus_get_project');
+          unifiedToolPatterns.set('get.*org$', 'nexus_get_project');
+          break;
+        case 'nexus_list_project_members':
+          unifiedToolPatterns.set('list.*member', 'nexus_list_project_members');
+          unifiedToolPatterns.set('get.*member', 'nexus_list_project_members');
+          unifiedToolPatterns.set('list.*collaborator', 'nexus_list_project_members');
+          break;
+
+        // Merge Requests / Pull Requests
+        case 'nexus_list_merge_requests':
+          unifiedToolPatterns.set('list.*pull.*request', 'nexus_list_merge_requests');
+          unifiedToolPatterns.set('list.*merge.*request', 'nexus_list_merge_requests');
+          unifiedToolPatterns.set('list.*pr', 'nexus_list_merge_requests');
+          unifiedToolPatterns.set('list.*mr', 'nexus_list_merge_requests');
+          break;
+        case 'nexus_get_merge_request':
+          unifiedToolPatterns.set('get.*pull.*request', 'nexus_get_merge_request');
+          unifiedToolPatterns.set('get.*merge.*request', 'nexus_get_merge_request');
+          unifiedToolPatterns.set('get.*pr$', 'nexus_get_merge_request');
+          unifiedToolPatterns.set('get.*mr$', 'nexus_get_merge_request');
+          break;
+        case 'nexus_create_merge_request':
+          unifiedToolPatterns.set('create.*pull.*request', 'nexus_create_merge_request');
+          unifiedToolPatterns.set('create.*merge.*request', 'nexus_create_merge_request');
+          unifiedToolPatterns.set('create.*pr$', 'nexus_create_merge_request');
+          unifiedToolPatterns.set('create.*mr$', 'nexus_create_merge_request');
+          break;
+        case 'nexus_merge_merge_request':
+          unifiedToolPatterns.set('merge.*pull.*request', 'nexus_merge_merge_request');
+          unifiedToolPatterns.set('merge.*merge.*request', 'nexus_merge_merge_request');
+          unifiedToolPatterns.set('merge.*pr$', 'nexus_merge_merge_request');
+          unifiedToolPatterns.set('merge.*mr$', 'nexus_merge_merge_request');
+          break;
+
+        // Pipelines / Workflows / Builds
+        case 'nexus_list_pipelines':
+          unifiedToolPatterns.set('list.*pipeline', 'nexus_list_pipelines');
+          unifiedToolPatterns.set('list.*workflow', 'nexus_list_pipelines');
+          unifiedToolPatterns.set('list.*build', 'nexus_list_pipelines');
+          unifiedToolPatterns.set('list.*action', 'nexus_list_pipelines');
+          break;
+        case 'nexus_trigger_pipeline':
+          unifiedToolPatterns.set('trigger.*pipeline', 'nexus_trigger_pipeline');
+          unifiedToolPatterns.set('run.*workflow', 'nexus_trigger_pipeline');
+          unifiedToolPatterns.set('start.*build', 'nexus_trigger_pipeline');
+          unifiedToolPatterns.set('dispatch.*workflow', 'nexus_trigger_pipeline');
+          break;
+        case 'nexus_cancel_pipeline':
+          unifiedToolPatterns.set('cancel.*pipeline', 'nexus_cancel_pipeline');
+          unifiedToolPatterns.set('cancel.*workflow', 'nexus_cancel_pipeline');
+          unifiedToolPatterns.set('cancel.*build', 'nexus_cancel_pipeline');
+          unifiedToolPatterns.set('stop.*workflow', 'nexus_cancel_pipeline');
+          break;
+
+        // Search
+        case 'nexus_search_code':
+          unifiedToolPatterns.set('search.*code', 'nexus_search_code');
+          unifiedToolPatterns.set('search.*file', 'nexus_search_code');
+          unifiedToolPatterns.set('code.*search', 'nexus_search_code');
+          break;
+        case 'nexus_search_repositories':
+          unifiedToolPatterns.set('search.*repositor', 'nexus_search_repositories');
+          unifiedToolPatterns.set('search.*repo', 'nexus_search_repositories');
+          unifiedToolPatterns.set('repository.*search', 'nexus_search_repositories');
+          break;
+        case 'nexus_search_issues':
+          unifiedToolPatterns.set('search.*issue', 'nexus_search_issues');
+          unifiedToolPatterns.set('search.*work.*item', 'nexus_search_issues');
+          unifiedToolPatterns.set('issue.*search', 'nexus_search_issues');
+          break;
+        case 'nexus_search_users':
+          unifiedToolPatterns.set('search.*user', 'nexus_search_users');
+          unifiedToolPatterns.set('user.*search', 'nexus_search_users');
+          unifiedToolPatterns.set('find.*user', 'nexus_search_users');
+          break;
+
+        // Branches
+        case 'nexus_list_branches':
+          unifiedToolPatterns.set('list.*branch', 'nexus_list_branches');
+          unifiedToolPatterns.set('get.*branch', 'nexus_list_branches');
+          unifiedToolPatterns.set('list.*ref', 'nexus_list_branches');
+          break;
+        case 'nexus_create_branch':
+          unifiedToolPatterns.set('create.*branch', 'nexus_create_branch');
+          unifiedToolPatterns.set('create.*ref', 'nexus_create_branch');
+          break;
+        case 'nexus_delete_branch':
+          unifiedToolPatterns.set('delete.*branch', 'nexus_delete_branch');
+          unifiedToolPatterns.set('delete.*ref', 'nexus_delete_branch');
+          break;
+
+        // Commits
+        case 'nexus_list_commits':
+          unifiedToolPatterns.set('list.*commit', 'nexus_list_commits');
+          unifiedToolPatterns.set('get.*commit', 'nexus_list_commits');
+          unifiedToolPatterns.set('get.*repository.*commit', 'nexus_list_commits');
+          break;
+        case 'nexus_get_commit':
+          unifiedToolPatterns.set('get.*commit$', 'nexus_get_commit');
+          unifiedToolPatterns.set('get.*repository.*commit$', 'nexus_get_commit');
+          break;
+        case 'nexus_get_commit_diff':
+          unifiedToolPatterns.set('get.*commit.*diff', 'nexus_get_commit_diff');
+          unifiedToolPatterns.set('get.*diff', 'nexus_get_commit_diff');
+          unifiedToolPatterns.set('compare.*commit', 'nexus_get_commit_diff');
           break;
         case 'nexus_update_work_item':
           unifiedToolPatterns.set('update.*work.*item', 'nexus_update_work_item');
@@ -699,6 +1068,74 @@ export class NexusProxyServer {
     if (provider.prompts.size > 0) {
       logger.log(`   💭 Prompts: ${provider.prompts.size}`);
     }
+
+    // After all providers are connected, show total tool reduction stats
+    const connectedProviders = this.providerManager
+      .getAllProviders()
+      .filter((p) => p.status === 'connected');
+    if (
+      connectedProviders.length > 0 &&
+      connectedProviders.every((p) => p.id === provider.id || p.lastUpdated)
+    ) {
+      setTimeout(() => {
+        this.printToolReductionStats();
+      }, 100); // Small delay to ensure all providers have finished connecting
+    }
+  }
+
+  private printToolReductionStats(): void {
+    const providers = this.providerManager.getAllProviders();
+    const connectedProviders = providers.filter((p) => p.status === 'connected');
+
+    if (connectedProviders.length === 0) return;
+
+    // Count total provider tools
+    const totalProviderTools = connectedProviders.reduce(
+      (sum, provider) => sum + provider.tools.size,
+      0,
+    );
+
+    // Count unified tools
+    const workItemTools = this.workItemsManager.createUnifiedTools();
+    const repositoryTools = this.repositoryManager.createUnifiedTools();
+    const projectTools = this.projectManager.createUnifiedTools();
+    const mergeRequestTools = this.mergeRequestManager.createUnifiedTools();
+    const pipelineTools = this.pipelineManager.createUnifiedTools();
+    const searchTools = this.searchManager.createUnifiedTools();
+    const branchTools = this.branchManager.createUnifiedTools();
+    const commitTools = this.commitManager.createUnifiedTools();
+    const managementTools = this.createAdditionalTools();
+
+    const totalUnifiedTools =
+      workItemTools.length +
+      repositoryTools.length +
+      projectTools.length +
+      mergeRequestTools.length +
+      pipelineTools.length +
+      searchTools.length +
+      branchTools.length +
+      commitTools.length +
+      managementTools.length;
+
+    const reductionPercentage =
+      totalProviderTools > 0
+        ? Math.round(((totalProviderTools - totalUnifiedTools) / totalProviderTools) * 100)
+        : 0;
+
+    logger.log(`\n🎯 === TOOL AGGREGATION SUMMARY ===`);
+    logger.log(`📊 Total provider tools: ${totalProviderTools}`);
+    logger.log(`🔧 Unified nexus tools: ${totalUnifiedTools}`);
+    logger.log(
+      `📉 Tool reduction: ${totalProviderTools - totalUnifiedTools} tools (-${reductionPercentage}%)`,
+    );
+    logger.log(`\n💡 Benefits:`);
+    logger.log(`   • Single interface across ${connectedProviders.length} DevOps platforms`);
+    logger.log(
+      `   • Reduced complexity for AI agents (${totalUnifiedTools} vs ${totalProviderTools} tools)`,
+    );
+    logger.log(`   • Fits within AI tool limits (GitHub Copilot: 128 tools max)`);
+    logger.log(`   • Consistent naming and parameter patterns`);
+    logger.log(`=====================================\n`);
   }
 
   private printDetailedToolBreakdown(): void {

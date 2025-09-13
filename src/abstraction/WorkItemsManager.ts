@@ -15,7 +15,7 @@ export class WorkItemsManager {
 
     // Set up cache refresh callback
     this.cacheManager.onCacheExpired = (cacheKey: string) => {
-      this.handleCacheExpired(cacheKey);
+      void this.handleCacheExpired(cacheKey);
     };
   }
 
@@ -102,7 +102,7 @@ export class WorkItemsManager {
                   }
                 }
                 break;
-              } catch (error) {
+              } catch {
                 // Continue to next provider on error - project might not exist in this provider
                 process.stderr.write(`No results from ${provider.id} for project "${project}"\n`);
               }
@@ -612,22 +612,38 @@ export class WorkItemsManager {
                 if (typeof project === 'object' && project !== null) {
                   const proj = project as Record<string, unknown>;
                   const projectId =
-                    proj.full_name || proj.path_with_namespace || proj.name || proj.id;
-                  const projectName = proj.name || proj.title || projectId;
+                    typeof proj.full_name === 'string'
+                      ? proj.full_name
+                      : typeof proj.path_with_namespace === 'string'
+                        ? proj.path_with_namespace
+                        : typeof proj.name === 'string'
+                          ? proj.name
+                          : typeof proj.id === 'string' || typeof proj.id === 'number'
+                            ? String(proj.id)
+                            : '';
+                  const projectName =
+                    typeof proj.name === 'string'
+                      ? proj.name
+                      : typeof proj.title === 'string'
+                        ? proj.title
+                        : projectId;
 
                   if (projectId && projectName) {
                     // Also fetch project members if available
-                    const members = await this.fetchProjectMembers(providerId, String(projectId));
+                    const members = await this.fetchProjectMembers(providerId, projectId);
 
                     projects.push({
                       id: `${providerId}:${projectId}`,
-                      name: String(projectName),
+                      name: projectName,
                       provider: providerId,
-                      description: proj.description ? String(proj.description) : undefined,
+                      description:
+                        typeof proj.description === 'string' ? proj.description : undefined,
                       url:
-                        proj.html_url || proj.web_url
-                          ? String(proj.html_url || proj.web_url)
-                          : undefined,
+                        typeof proj.html_url === 'string'
+                          ? proj.html_url
+                          : typeof proj.web_url === 'string'
+                            ? proj.web_url
+                            : undefined,
                       members,
                     });
                   }
@@ -685,8 +701,15 @@ export class WorkItemsManager {
                   userId: String(mem.id ?? mem.user_id ?? mem.username),
                   username: String(mem.username ?? mem.login ?? mem.name),
                   displayName: String(mem.name ?? mem.display_name ?? mem.username ?? mem.login),
-                  email: mem.email ? String(mem.email) : undefined,
-                  role: String(mem.role ?? mem.permission ?? mem.access_level ?? 'member'),
+                  email: typeof mem.email === 'string' ? mem.email : undefined,
+                  role:
+                    typeof mem.role === 'string'
+                      ? mem.role
+                      : typeof mem.permission === 'string'
+                        ? mem.permission
+                        : typeof mem.access_level === 'string'
+                          ? mem.access_level
+                          : 'member',
                   accessLevel: typeof mem.access_level === 'number' ? mem.access_level : undefined,
                 } as UserRole;
               });
@@ -776,8 +799,15 @@ export class WorkItemsManager {
                     userId: String(usr.id ?? usr.user_id ?? usr.username),
                     username: String(usr.username ?? usr.login ?? usr.name),
                     displayName: String(usr.name ?? usr.display_name ?? usr.username ?? usr.login),
-                    email: usr.email ? String(usr.email) : undefined,
-                    role: String(usr.role ?? usr.permission ?? usr.access_level ?? 'member'),
+                    email: typeof usr.email === 'string' ? usr.email : undefined,
+                    role:
+                      typeof usr.role === 'string'
+                        ? usr.role
+                        : typeof usr.permission === 'string'
+                          ? usr.permission
+                          : typeof usr.access_level === 'string'
+                            ? usr.access_level
+                            : 'member',
                     accessLevel:
                       typeof usr.access_level === 'number' ? usr.access_level : undefined,
                   });

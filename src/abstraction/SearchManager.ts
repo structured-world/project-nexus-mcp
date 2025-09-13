@@ -374,27 +374,97 @@ export class SearchManager {
     }
 
     // Sort by relevance/score
-    return results.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   }
 
   private normalizeSearchResult(
-    item: any,
+    item: unknown,
     type: SearchResult['type'],
     provider: string,
   ): SearchResult {
+    const itemData = item as Record<string, unknown>;
     return {
       type: type,
-      id: item.id?.toString() || item.number?.toString() || '',
-      title: item.title || item.name || item.login || item.username || item.path || '',
-      description: item.body || item.description || item.snippet || '',
-      url: item.html_url || item.web_url || item.url || '',
+      id:
+        typeof itemData.id === 'string' || typeof itemData.id === 'number'
+          ? String(itemData.id)
+          : typeof itemData.number === 'string' || typeof itemData.number === 'number'
+            ? String(itemData.number)
+            : '',
+      title:
+        typeof itemData.title === 'string'
+          ? itemData.title
+          : typeof itemData.name === 'string'
+            ? itemData.name
+            : typeof itemData.login === 'string'
+              ? itemData.login
+              : typeof itemData.username === 'string'
+                ? itemData.username
+                : typeof itemData.path === 'string'
+                  ? itemData.path
+                  : '',
+      description:
+        typeof itemData.body === 'string'
+          ? itemData.body
+          : typeof itemData.description === 'string'
+            ? itemData.description
+            : typeof itemData.snippet === 'string'
+              ? itemData.snippet
+              : '',
+      url:
+        typeof itemData.html_url === 'string'
+          ? itemData.html_url
+          : typeof itemData.web_url === 'string'
+            ? itemData.web_url
+            : typeof itemData.url === 'string'
+              ? itemData.url
+              : '',
       repository:
-        item.repository?.full_name || item.project?.name_with_namespace || item.repo?.name,
-      path: item.path || item.file?.path,
-      language: item.language || item.file?.language,
-      score: item.score || item.relevance,
+        typeof itemData.repository === 'object' &&
+        itemData.repository &&
+        typeof (itemData.repository as Record<string, unknown>).full_name === 'string'
+          ? ((itemData.repository as Record<string, unknown>).full_name as string)
+          : typeof itemData.project === 'object' &&
+              itemData.project &&
+              typeof (itemData.project as Record<string, unknown>).name_with_namespace === 'string'
+            ? ((itemData.project as Record<string, unknown>).name_with_namespace as string)
+            : typeof itemData.repo === 'object' &&
+                itemData.repo &&
+                typeof (itemData.repo as Record<string, unknown>).name === 'string'
+              ? ((itemData.repo as Record<string, unknown>).name as string)
+              : undefined,
+      path:
+        typeof itemData.path === 'string'
+          ? itemData.path
+          : typeof itemData.file === 'object' &&
+              itemData.file &&
+              typeof (itemData.file as Record<string, unknown>).path === 'string'
+            ? ((itemData.file as Record<string, unknown>).path as string)
+            : undefined,
+      language:
+        typeof itemData.language === 'string'
+          ? itemData.language
+          : typeof itemData.file === 'object' &&
+              itemData.file &&
+              typeof (itemData.file as Record<string, unknown>).language === 'string'
+            ? ((itemData.file as Record<string, unknown>).language as string)
+            : undefined,
+      score:
+        typeof itemData.score === 'number'
+          ? itemData.score
+          : typeof itemData.relevance === 'number'
+            ? itemData.relevance
+            : undefined,
       provider: provider,
-      highlights: item.text_matches?.map((match: any) => match.fragment) || [],
+      highlights: Array.isArray(itemData.text_matches)
+        ? itemData.text_matches.map((match: unknown) =>
+            typeof match === 'object' &&
+            match &&
+            typeof (match as Record<string, unknown>).fragment === 'string'
+              ? ((match as Record<string, unknown>).fragment as string)
+              : '',
+          )
+        : [],
     };
   }
 

@@ -244,9 +244,12 @@ export class RepositoryManager {
             const parsedFiles: unknown = JSON.parse(filesJson);
 
             if (Array.isArray(parsedFiles)) {
-              return parsedFiles.map(
-                (file: Record<string, unknown>) =>
-                  (file.name as string) ?? (file.path as string) ?? String(file),
+              return parsedFiles.map((file: Record<string, unknown>) =>
+                typeof file.name === 'string'
+                  ? file.name
+                  : typeof file.path === 'string'
+                    ? file.path
+                    : '[unknown file]',
               );
             }
           }
@@ -307,36 +310,88 @@ export class RepositoryManager {
   }
 
   private normalizeRepository(repo: ProviderRepository, provider: string): Repository {
-    const repoData = repo as Record<string, any>;
+    const repoData = repo as Record<string, unknown>;
     return {
-      id: (repoData.id?.toString() as string) ?? (repoData.name as string) ?? '',
-      name: (repoData.name as string) ?? (repoData.repository_name as string) ?? '',
+      id:
+        typeof repoData.id === 'string' || typeof repoData.id === 'number'
+          ? String(repoData.id)
+          : typeof repoData.name === 'string'
+            ? repoData.name
+            : '',
+      name:
+        typeof repoData.name === 'string'
+          ? repoData.name
+          : typeof repoData.repository_name === 'string'
+            ? repoData.repository_name
+            : '',
       fullName:
-        (repoData.full_name as string) ??
-        (repoData.name_with_namespace as string) ??
-        `${(repoData.owner?.login as string) ?? ''}/${(repoData.name as string) ?? ''}`,
-      description: (repoData.description as string) ?? '',
+        typeof repoData.full_name === 'string'
+          ? repoData.full_name
+          : typeof repoData.name_with_namespace === 'string'
+            ? repoData.name_with_namespace
+            : `${
+                typeof repoData.owner === 'object' &&
+                repoData.owner &&
+                typeof (repoData.owner as Record<string, unknown>).login === 'string'
+                  ? ((repoData.owner as Record<string, unknown>).login as string)
+                  : ''
+              }/${typeof repoData.name === 'string' ? repoData.name : ''}`,
+      description: typeof repoData.description === 'string' ? repoData.description : '',
       url:
-        (repoData.html_url as string) ??
-        (repoData.web_url as string) ??
-        (repoData.url as string) ??
-        '',
+        typeof repoData.html_url === 'string'
+          ? repoData.html_url
+          : typeof repoData.web_url === 'string'
+            ? repoData.web_url
+            : typeof repoData.url === 'string'
+              ? repoData.url
+              : '',
       defaultBranch:
-        (repoData.default_branch as string) ?? (repoData.defaultBranch as string) ?? 'main',
-      private: ((repoData.private as boolean) ?? repoData.visibility === 'private') || false,
-      language: (repoData.language as string) ?? (repoData.primaryLanguage?.name as string) ?? '',
+        typeof repoData.default_branch === 'string'
+          ? repoData.default_branch
+          : typeof repoData.defaultBranch === 'string'
+            ? repoData.defaultBranch
+            : 'main',
+      private:
+        (typeof repoData.private === 'boolean'
+          ? repoData.private
+          : repoData.visibility === 'private') || false,
+      language:
+        typeof repoData.language === 'string'
+          ? repoData.language
+          : typeof repoData.primaryLanguage === 'object' &&
+              repoData.primaryLanguage &&
+              typeof (repoData.primaryLanguage as Record<string, unknown>).name === 'string'
+            ? ((repoData.primaryLanguage as Record<string, unknown>).name as string)
+            : '',
       stars:
-        (repoData.stargazers_count as number) ??
-        (repoData.star_count as number) ??
-        (repoData.stars as number) ??
-        0,
-      forks: (repoData.forks_count as number) ?? (repoData.forks as number) ?? 0,
+        typeof repoData.stargazers_count === 'number'
+          ? repoData.stargazers_count
+          : typeof repoData.star_count === 'number'
+            ? repoData.star_count
+            : typeof repoData.stars === 'number'
+              ? repoData.stars
+              : 0,
+      forks:
+        typeof repoData.forks_count === 'number'
+          ? repoData.forks_count
+          : typeof repoData.forks === 'number'
+            ? repoData.forks
+            : 0,
       provider,
-      createdAt: (repoData.created_at as string) ?? (repoData.createdAt as string),
+      createdAt:
+        typeof repoData.created_at === 'string'
+          ? repoData.created_at
+          : typeof repoData.createdAt === 'string'
+            ? repoData.createdAt
+            : undefined,
       updatedAt:
-        (repoData.updated_at as string) ??
-        (repoData.updatedAt as string) ??
-        (repoData.last_activity_at as string),
+        typeof repoData.updated_at === 'string'
+          ? repoData.updated_at
+          : typeof repoData.updatedAt === 'string'
+            ? repoData.updatedAt
+            : typeof repoData.last_activity_at === 'string'
+              ? repoData.last_activity_at
+              : undefined,
     };
   }
 

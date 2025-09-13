@@ -480,7 +480,7 @@ export class MergeRequestManager {
   }
 
   private normalizeState(state: string): 'open' | 'closed' | 'merged' {
-    const lowState = state?.toLowerCase() ?? '';
+    const lowState = state.toLowerCase();
     if (lowState === 'merged') return 'merged';
     if (lowState === 'closed') return 'closed';
     return 'open';

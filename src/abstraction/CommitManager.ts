@@ -121,7 +121,9 @@ export class CommitManager {
             const parsedCommits: unknown = JSON.parse(commitsJson);
 
             if (Array.isArray(parsedCommits)) {
-              return parsedCommits.map((commit: unknown) => this.normalizeCommit(commit as ProviderCommit, provider));
+              return parsedCommits.map((commit: unknown) =>
+                this.normalizeCommit(commit as ProviderCommit, provider),
+              );
             }
           }
         } catch (error) {
@@ -345,7 +347,7 @@ export class CommitManager {
   }
 
   private normalizeFileStatus(status: string): 'added' | 'modified' | 'removed' | 'renamed' {
-    const lowStatus = status?.toLowerCase() ?? '';
+    const lowStatus = status.toLowerCase();
     if (['added', 'new'].includes(lowStatus)) return 'added';
     if (['modified', 'changed'].includes(lowStatus)) return 'modified';
     if (['removed', 'deleted'].includes(lowStatus)) return 'removed';

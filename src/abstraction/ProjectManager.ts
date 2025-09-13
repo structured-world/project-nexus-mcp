@@ -91,7 +91,7 @@ export class ProjectManager {
       for (const toolName of possibleTools) {
         if (providerInstance.tools.has(toolName)) {
           try {
-            const result = await this.providerManager.callTool(toolName, filters || {});
+            const result = await this.providerManager.callTool(toolName, filters ?? {});
 
             if (hasTextContent(result)) {
               const projectsJson = result.content[0].text;
@@ -312,60 +312,113 @@ export class ProjectManager {
   }
 
   private normalizeProject(project: ProviderProject, provider: string): Project {
-    const projectData = project as Record<string, any>;
+    const projectData = project as Record<string, unknown>;
     return {
-      id: (projectData.id?.toString() as string) ?? (projectData.name as string) ?? '',
-      name: (projectData.name as string) ?? (projectData.login as string) ?? '',
+      id:
+        typeof projectData.id === 'string' || typeof projectData.id === 'number'
+          ? String(projectData.id)
+          : typeof projectData.name === 'string'
+            ? projectData.name
+            : '',
+      name:
+        typeof projectData.name === 'string'
+          ? projectData.name
+          : typeof projectData.login === 'string'
+            ? projectData.login
+            : '',
       fullName:
-        (projectData.full_name as string) ??
-        (projectData.name_with_namespace as string) ??
-        (projectData.name as string) ??
-        '',
-      description: (projectData.description as string) ?? '',
+        typeof projectData.full_name === 'string'
+          ? projectData.full_name
+          : typeof projectData.name_with_namespace === 'string'
+            ? projectData.name_with_namespace
+            : typeof projectData.name === 'string'
+              ? projectData.name
+              : '',
+      description: typeof projectData.description === 'string' ? projectData.description : '',
       url:
-        (projectData.html_url as string) ??
-        (projectData.web_url as string) ??
-        (projectData.url as string) ??
-        '',
+        typeof projectData.html_url === 'string'
+          ? projectData.html_url
+          : typeof projectData.web_url === 'string'
+            ? projectData.web_url
+            : typeof projectData.url === 'string'
+              ? projectData.url
+              : '',
       visibility: this.normalizeVisibility(projectData.visibility ?? projectData.private),
       provider,
-      createdAt: (projectData.created_at as string) ?? (projectData.createdAt as string),
-      updatedAt: (projectData.updated_at as string) ?? (projectData.updatedAt as string),
+      createdAt:
+        typeof projectData.created_at === 'string'
+          ? projectData.created_at
+          : typeof projectData.createdAt === 'string'
+            ? projectData.createdAt
+            : undefined,
+      updatedAt:
+        typeof projectData.updated_at === 'string'
+          ? projectData.updated_at
+          : typeof projectData.updatedAt === 'string'
+            ? projectData.updatedAt
+            : undefined,
       defaultBranch:
-        (projectData.default_branch as string) ?? (projectData.defaultBranch as string),
+        typeof projectData.default_branch === 'string'
+          ? projectData.default_branch
+          : typeof projectData.defaultBranch === 'string'
+            ? projectData.defaultBranch
+            : undefined,
       repositoryCount:
-        (projectData.public_repos as number) ?? (projectData.repository_count as number),
-      memberCount: projectData.member_count as number,
+        typeof projectData.public_repos === 'number'
+          ? projectData.public_repos
+          : typeof projectData.repository_count === 'number'
+            ? projectData.repository_count
+            : undefined,
+      memberCount:
+        typeof projectData.member_count === 'number' ? projectData.member_count : undefined,
     };
   }
 
   private normalizeProjectMember(member: ProviderMember, provider: string): ProjectMember {
     return {
-      id: member.id?.toString() ?? (member.username as string) ?? '',
+      id:
+        typeof member.id === 'string' || typeof member.id === 'number'
+          ? String(member.id)
+          : typeof member.username === 'string'
+            ? member.username
+            : '',
       username:
-        (member.login as string) ?? (member.username as string) ?? (member.name as string) ?? '',
-      name: member.name as string,
-      email: member.email as string,
+        typeof member.login === 'string'
+          ? member.login
+          : typeof member.username === 'string'
+            ? member.username
+            : typeof member.name === 'string'
+              ? member.name
+              : '',
+      name: typeof member.name === 'string' ? member.name : undefined,
+      email: typeof member.email === 'string' ? member.email : undefined,
       role: this.normalizeRole(member.role ?? member.permission ?? member.access_level),
       accessLevel:
-        member.access_level ??
-        this.roleToAccessLevel(
-          (member.role as string) ?? (member.permission as string) ?? 'member',
-        ),
+        typeof member.access_level === 'number'
+          ? member.access_level
+          : this.roleToAccessLevel(
+              typeof member.role === 'string'
+                ? member.role
+                : typeof member.permission === 'string'
+                  ? member.permission
+                  : 'member',
+            ),
       provider,
     };
   }
 
-  private normalizeVisibility(visibility: any): 'public' | 'private' | 'internal' {
+  private normalizeVisibility(visibility: unknown): 'public' | 'private' | 'internal' {
     if (typeof visibility === 'boolean') {
       return visibility ? 'private' : 'public';
     }
-    const vis = visibility?.toLowerCase() || 'public';
-    if (['private', 'internal'].includes(vis)) return vis as 'private' | 'internal';
+    if (typeof visibility === 'string') {
+      const vis = visibility.toLowerCase();
+      if (['private', 'internal'].includes(vis)) return vis as 'private' | 'internal';
+    }
     return 'public';
   }
 
-  private normalizeRole(role: any): string {
+  private normalizeRole(role: unknown): string {
     if (typeof role === 'number') {
       // GitLab access levels
       if (role >= 50) return 'owner';
@@ -374,7 +427,10 @@ export class ProjectManager {
       if (role >= 20) return 'reporter';
       return 'guest';
     }
-    return role?.toLowerCase() || 'member';
+    if (typeof role === 'string') {
+      return role.toLowerCase();
+    }
+    return 'member';
   }
 
   private roleToAccessLevel(role: string): number {

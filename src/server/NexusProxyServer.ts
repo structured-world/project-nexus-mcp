@@ -11,7 +11,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ProviderManager } from '../providers/ProviderManager.js';
 import { WorkItemsManager } from '../abstraction/WorkItemsManager.js';
-import { NexusConfig } from '../types/index.js';
+import { NexusConfig, ProviderInstance } from '../types/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createServer } from 'http';
@@ -106,6 +106,14 @@ export class NexusProxyServer {
   private setupProviderEventHandlers(): void {
     this.providerManager.on('provider:connected', (provider: { id: string }) => {
       logger.log(`🔗 Provider connected: ${provider.id}`);
+
+      // Show detailed tool information when provider connects
+      const providerInstance = this.providerManager
+        .getAllProviders()
+        .find((p) => p.id === provider.id);
+      if (providerInstance && providerInstance.status === 'connected') {
+        this.printProviderToolsOnConnect(providerInstance);
+      }
     });
 
     this.providerManager.on('provider:disconnected', (provider: { id: string }) => {
@@ -487,13 +495,13 @@ export class NexusProxyServer {
       });
     }
 
-    if (process.env.AZURE_TOKEN) {
+    if (process.env.AZURE_TOKEN && process.env.AZURE_ORG) {
       providers.push({
         id: 'azure',
         name: 'Azure DevOps',
         type: 'stdio' as const,
         command: 'yarn',
-        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
+        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG],
         env: {
           AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },
@@ -563,13 +571,13 @@ export class NexusProxyServer {
       });
     }
 
-    if (process.env.AZURE_TOKEN) {
+    if (process.env.AZURE_TOKEN && process.env.AZURE_ORG) {
       providers.push({
         id: 'azure',
         name: 'Azure DevOps',
         type: 'stdio' as const,
         command: 'yarn',
-        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
+        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG],
         env: {
           AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },
@@ -701,13 +709,158 @@ export class NexusProxyServer {
       const unifiedTools = this.workItemsManager.createUnifiedTools().length;
       const additionalTools = this.createAdditionalTools().length;
 
-      logger.log(`📋 Available tools: ${totalTools + unifiedTools + additionalTools} total`);
+      logger.log(`\\n📋 Available tools: ${totalTools + unifiedTools + additionalTools} total`);
       logger.log(`   - Provider tools: ${totalTools}`);
       logger.log(`   - Unified work item tools: ${unifiedTools}`);
       logger.log(`   - Management tools: ${additionalTools}`);
+
+      // Show detailed tool breakdown with unified annotations
+      this.printDetailedToolBreakdown();
     }
 
     logger.log(`=====================================`);
+  }
+
+  private printProviderToolsOnConnect(provider: ProviderInstance): void {
+    if (provider.tools.size === 0) {
+      return;
+    }
+
+    const unifiedTools = this.workItemsManager.createUnifiedTools();
+    const unifiedToolPatterns = new Map<string, string>();
+
+    // Build unified tool pattern map
+    for (const tool of unifiedTools) {
+      switch (tool.name) {
+        case 'nexus_list_work_items':
+          unifiedToolPatterns.set('list.*work.*item', 'nexus_list_work_items');
+          unifiedToolPatterns.set('get.*work.*item', 'nexus_list_work_items');
+          unifiedToolPatterns.set('list.*issue', 'nexus_list_work_items');
+          unifiedToolPatterns.set('get.*issue', 'nexus_list_work_items');
+          break;
+        case 'nexus_create_work_item':
+          unifiedToolPatterns.set('create.*work.*item', 'nexus_create_work_item');
+          unifiedToolPatterns.set('create.*issue', 'nexus_create_work_item');
+          break;
+        case 'nexus_update_work_item':
+          unifiedToolPatterns.set('update.*work.*item', 'nexus_update_work_item');
+          unifiedToolPatterns.set('update.*issue', 'nexus_update_work_item');
+          break;
+        case 'nexus_transfer_work_item':
+          unifiedToolPatterns.set('transfer.*work.*item', 'nexus_transfer_work_item');
+          unifiedToolPatterns.set('move.*issue', 'nexus_transfer_work_item');
+          break;
+      }
+    }
+
+    logger.log(`   📝 Provider tools (${provider.tools.size} total, showing first 10):`);
+    const toolsList = Array.from(provider.tools.values())
+      .sort((a: Tool, b: Tool) => a.name.localeCompare(b.name))
+      .slice(0, 10);
+
+    for (const tool of toolsList) {
+      const originalToolName = tool.name.substring(provider.id.length + 1);
+      let annotation = '';
+
+      // Check if this tool is unified/replaced
+      for (const [pattern, unifiedTool] of unifiedToolPatterns) {
+        const regex = new RegExp(pattern, 'i');
+        if (regex.test(originalToolName)) {
+          annotation = ` [unified → ${unifiedTool}]`;
+          break;
+        }
+      }
+
+      logger.log(`     • ${originalToolName}${annotation}`);
+    }
+
+    if (provider.tools.size > 10) {
+      logger.log(`     ... and ${provider.tools.size - 10} more tools`);
+    }
+
+    // Show resources and prompts summary if any
+    if (provider.resources.size > 0) {
+      logger.log(`   📚 Resources: ${provider.resources.size}`);
+    }
+    if (provider.prompts.size > 0) {
+      logger.log(`   💭 Prompts: ${provider.prompts.size}`);
+    }
+  }
+
+  private printDetailedToolBreakdown(): void {
+    const providers = this.providerManager.getAllProviders();
+    const unifiedTools = this.workItemsManager.createUnifiedTools();
+    const managementTools = this.createAdditionalTools();
+
+    // Create a map of unified tool patterns to detect which provider tools are replaced
+    const unifiedToolPatterns = new Map<string, string>();
+    for (const tool of unifiedTools) {
+      switch (tool.name) {
+        case 'nexus_list_work_items':
+          // These provider tools would be unified under this
+          unifiedToolPatterns.set('list.*work.*item', 'nexus_list_work_items');
+          unifiedToolPatterns.set('get.*work.*item', 'nexus_list_work_items');
+          unifiedToolPatterns.set('list.*issue', 'nexus_list_work_items');
+          unifiedToolPatterns.set('get.*issue', 'nexus_list_work_items');
+          break;
+        case 'nexus_create_work_item':
+          unifiedToolPatterns.set('create.*work.*item', 'nexus_create_work_item');
+          unifiedToolPatterns.set('create.*issue', 'nexus_create_work_item');
+          break;
+        case 'nexus_update_work_item':
+          unifiedToolPatterns.set('update.*work.*item', 'nexus_update_work_item');
+          unifiedToolPatterns.set('update.*issue', 'nexus_update_work_item');
+          break;
+        case 'nexus_transfer_work_item':
+          unifiedToolPatterns.set('transfer.*work.*item', 'nexus_transfer_work_item');
+          unifiedToolPatterns.set('move.*issue', 'nexus_transfer_work_item');
+          break;
+      }
+    }
+
+    logger.log(`\\n🔧 Tool Breakdown by Provider:`);
+
+    for (const provider of providers) {
+      if (provider.status !== 'connected' || provider.tools.size === 0) {
+        continue;
+      }
+
+      logger.log(`\\n   📦 ${provider.config.name} (${provider.id}):`);
+
+      const toolsList = Array.from(provider.tools.values()).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+
+      for (const tool of toolsList) {
+        const originalToolName = tool.name.substring(provider.id.length + 1); // Remove prefix
+        let annotation = '';
+
+        // Check if this tool is unified/replaced
+        for (const [pattern, unifiedTool] of unifiedToolPatterns) {
+          const regex = new RegExp(pattern, 'i');
+          if (regex.test(originalToolName)) {
+            annotation = ` [unified → ${unifiedTool}]`;
+            break;
+          }
+        }
+
+        logger.log(`     • ${originalToolName}${annotation}`);
+      }
+    }
+
+    if (unifiedTools.length > 0) {
+      logger.log(`\\n   🔗 Unified Tools:`);
+      for (const tool of unifiedTools) {
+        logger.log(`     • ${tool.name} - ${tool.description}`);
+      }
+    }
+
+    if (managementTools.length > 0) {
+      logger.log(`\\n   ⚙️  Management Tools:`);
+      for (const tool of managementTools) {
+        logger.log(`     • ${tool.name} - ${tool.description}`);
+      }
+    }
   }
 
   async shutdown(): Promise<void> {

@@ -6,13 +6,15 @@ export type LoggingMode = 'file' | 'stderr' | 'auto';
 export class Logger {
   private static instance: Logger | undefined;
   private logFile: string;
+  private sessionId: string;
   private isStdioMode: boolean = false;
   private loggingMode: LoggingMode;
 
   private constructor() {
     const date = new Date().toISOString().split('T')[0];
-    const sessionId = Math.random().toString(36).substring(2, 8);
-    this.logFile = path.join('/tmp', `.log.nexus.${date}-${sessionId}`);
+    this.sessionId = Math.random().toString(36).substring(2, 8);
+    // Use single log file for all sessions
+    this.logFile = path.join('/tmp', `.log.nexus.${date}`);
 
     // Get logging mode from environment variable
     const envMode = process.env.NEXUS_LOG_MODE?.toLowerCase() as LoggingMode;
@@ -49,7 +51,7 @@ export class Logger {
       if (!fs.existsSync(this.logFile)) {
         fs.writeFileSync(
           this.logFile,
-          `[${new Date().toISOString()}] Project Nexus MCP Server Log Started\n`,
+          `[${new Date().toISOString()}] [INFO] [${this.sessionId}] Project Nexus MCP Server Log Started\n`,
         );
       }
     } catch {
@@ -74,7 +76,7 @@ export class Logger {
               .join(' ')}`
           : message;
 
-      const logLine = `[${timestamp}] [${level}] ${formattedMessage}\n`;
+      const logLine = `[${timestamp}] [${level}] [${this.sessionId}] ${formattedMessage}\n`;
       fs.appendFileSync(this.logFile, logLine);
     } catch {
       // Silent fail - don't pollute stderr when using file logging

@@ -16,8 +16,16 @@ export class ProviderManager extends EventEmitter {
   private static readonly REQUEST_TIMEOUT_MS = 30000; // 30 seconds
 
   async initializeProvider(config: ProviderConfig): Promise<ProviderInstance> {
+    process.stderr.write(`\n=== Initializing ${config.id} Provider ===\n`);
+    process.stderr.write(`  Provider: ${config.name}\n`);
+    process.stderr.write(`  Type: ${config.type}\n`);
+    process.stderr.write(`  Command: ${config.command}\n`);
+    process.stderr.write(`  Args: [${config.args?.join(', ') ?? 'none'}]\n`);
+
     // Validate tokens before attempting to initialize
     const hasRequiredTokens = this.validateProviderTokens(config);
+    process.stderr.write(`  Token validation: ${hasRequiredTokens ? 'PASSED' : 'FAILED'}\n`);
+
     if (!hasRequiredTokens) {
       const instance: ProviderInstance = {
         id: config.id,
@@ -31,6 +39,7 @@ export class ProviderManager extends EventEmitter {
         shouldReconnect: false,
         lastUpdated: new Date(),
       };
+      process.stderr.write(`  ❌ Skipping initialization - missing required tokens\n`);
       this.providers.set(config.id, instance);
       this.emit('provider:auth_failed', instance);
       return instance;
@@ -50,26 +59,37 @@ export class ProviderManager extends EventEmitter {
     };
 
     try {
+      process.stderr.write(`  Creating client transport...\n`);
+
       if (config.type === 'stdio' && config.command) {
         instance.client = await this.createStdioClient(config);
+        process.stderr.write(`  ✓ STDIO client created successfully\n`);
       } else if (config.type === 'sse' && config.url) {
         instance.client = await this.createSSEClient(config);
+        process.stderr.write(`  ✓ SSE client created successfully\n`);
       } else if (config.type === 'http' && config.url) {
         instance.client = await this.createHTTPClient(config);
+        process.stderr.write(`  ✓ HTTP client created successfully\n`);
       }
 
       if (instance.client) {
-        process.stderr.write(`  Connecting to ${config.name}...\n`);
+        process.stderr.write(`  Loading capabilities from ${config.name}...\n`);
         await this.connectAndLoadCapabilities(instance);
-        process.stderr.write(`  Loaded capabilities from ${config.name}\n`);
+        process.stderr.write(`  ✓ Capabilities loaded from ${config.name}\n`);
+      } else {
+        throw new Error(`Failed to create client for ${config.id}`);
       }
 
       instance.status = 'connected';
       instance.reconnectAttempts = 0; // Reset on successful connection
       this.setupProviderMonitoring(instance);
       this.providers.set(config.id, instance);
+      process.stderr.write(`  ✅ Provider ${config.id} initialized successfully\n`);
       this.emit('provider:connected', instance);
     } catch (error) {
+      process.stderr.write(
+        `  ❌ Provider ${config.id} initialization failed: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
       const classification = classifyError(error);
 
       instance.status = classification.type === 'auth' ? 'auth_failed' : 'error';
@@ -123,13 +143,35 @@ export class ProviderManager extends EventEmitter {
 
     process.stderr.write(`  Spawning: ${command} ${args.join(' ')}\n`);
 
+    // Add debug logging for Azure specifically
+    if (config.id === 'azure') {
+      process.stderr.write(`  Azure environment variables:\n`);
+      for (const [key, value] of Object.entries(env)) {
+        if (key.includes('AZURE')) {
+          process.stderr.write(`    ${key}: ${value ? '[SET]' : '[NOT SET]'}\n`);
+        }
+      }
+    }
+
     const transport = new StdioClientTransport({
       command,
       args,
       env,
     });
 
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+      if (config.id === 'azure') {
+        process.stderr.write(`  Azure MCP client connected successfully\n`);
+      }
+    } catch (error) {
+      if (config.id === 'azure') {
+        process.stderr.write(
+          `  Azure MCP connection failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+      throw error;
+    }
 
     return client;
   }
@@ -168,8 +210,10 @@ export class ProviderManager extends EventEmitter {
       throw new Error('Client not initialized');
     }
 
+    process.stderr.write(`    Listing tools...\n`);
     try {
       const listToolsResult = await client.listTools();
+      process.stderr.write(`    ✓ Found ${listToolsResult.tools.length} tools\n`);
       for (const tool of listToolsResult.tools) {
         const prefixedName = `${instance.id}_${tool.name}`;
         instance.tools.set(prefixedName, {
@@ -180,12 +224,14 @@ export class ProviderManager extends EventEmitter {
       }
     } catch (error) {
       process.stderr.write(
-        `Could not list tools for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
+        `    ❌ Could not list tools for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
+    process.stderr.write(`    Listing resources...\n`);
     try {
       const listResourcesResult = await client.listResources();
+      process.stderr.write(`    ✓ Found ${listResourcesResult.resources.length} resources\n`);
       for (const resource of listResourcesResult.resources) {
         const prefixedUri = `${instance.id}:${resource.uri}`;
         instance.resources.set(prefixedUri, {
@@ -196,12 +242,14 @@ export class ProviderManager extends EventEmitter {
       }
     } catch (error) {
       process.stderr.write(
-        `Could not list resources for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
+        `    ❌ Could not list resources for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
+    process.stderr.write(`    Listing prompts...\n`);
     try {
       const listPromptsResult = await client.listPrompts();
+      process.stderr.write(`    ✓ Found ${listPromptsResult.prompts.length} prompts\n`);
       for (const prompt of listPromptsResult.prompts) {
         const prefixedName = `${instance.id}_${prompt.name}`;
         instance.prompts.set(prefixedName, {
@@ -212,7 +260,7 @@ export class ProviderManager extends EventEmitter {
       }
     } catch (error) {
       process.stderr.write(
-        `Could not list prompts for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
+        `    ❌ Could not list prompts for ${instance.id}: ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
   }
@@ -517,15 +565,28 @@ export class ProviderManager extends EventEmitter {
    */
   private validateProviderTokens(config: ProviderConfig): boolean {
     switch (config.id) {
-      case 'github':
-        return Boolean(process.env.GITHUB_TOKEN);
-      case 'gitlab':
-        return Boolean(process.env.GITLAB_TOKEN);
-      case 'azure':
-        return Boolean(process.env.AZURE_TOKEN && process.env.AZURE_ORG);
-      default:
+      case 'github': {
+        const hasGithubToken = Boolean(process.env.GITHUB_TOKEN);
+        process.stderr.write(`    GITHUB_TOKEN: ${hasGithubToken ? 'SET' : 'MISSING'}\n`);
+        return hasGithubToken;
+      }
+      case 'gitlab': {
+        const hasGitlabToken = Boolean(process.env.GITLAB_TOKEN);
+        process.stderr.write(`    GITLAB_TOKEN: ${hasGitlabToken ? 'SET' : 'MISSING'}\n`);
+        return hasGitlabToken;
+      }
+      case 'azure': {
+        const hasAzureToken = Boolean(process.env.AZURE_TOKEN);
+        const hasAzureOrg = Boolean(process.env.AZURE_ORG);
+        process.stderr.write(`    AZURE_TOKEN: ${hasAzureToken ? 'SET' : 'MISSING'}\n`);
+        process.stderr.write(`    AZURE_ORG: ${hasAzureOrg ? 'SET' : 'MISSING'}\n`);
+        return hasAzureToken && hasAzureOrg;
+      }
+      default: {
         // For unknown providers, assume tokens are not required
+        process.stderr.write(`    No validation required for ${config.id}\n`);
         return true;
+      }
     }
   }
 

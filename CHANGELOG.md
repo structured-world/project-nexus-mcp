@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.3...v1.6.0) (2025-09-13)
+
+
+### Features
+
+* add version logging from package.json at startup ([48fe980](https://github.com/structured-world/project-nexus-mcp/commit/48fe98080ddfcf03371323da63db1b44de54dbca))
+
 ## [1.5.3](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.2...v1.5.3) (2025-09-13)
 
 

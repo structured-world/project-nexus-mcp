@@ -1,3 +1,10 @@
+## [1.3.5](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.4...v1.3.5) (2025-09-13)
+
+
+### Bug Fixes
+
+* resolve brace-expansion security vulnerability ([cf99fd8](https://github.com/structured-world/project-nexus-mcp/commit/cf99fd80cf2a038df5cbf76d693a9ce0ba8ee0d7))
+
 ## [1.3.4](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.3...v1.3.4) (2025-09-13)
 
 ### Bug Fixes

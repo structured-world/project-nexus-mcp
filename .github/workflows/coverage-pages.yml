@@ -46,11 +46,14 @@ concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: true
 
-# Set permissions for GitHub Pages deployment
+# Set permissions for GitHub Pages deployment and PR comments
 permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
+  issues: write
+  actions: read
 
 jobs:
   # Job 1: Generate coverage reports
@@ -126,37 +129,45 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const summary = fs.readFileSync('coverage-summary.md', 'utf8');
             
-            // Find existing coverage comment
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const existingComment = comments.data.find(comment => 
-              comment.body.includes('## 📊 Test Coverage Report')
-            );
-            
-            if (existingComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existingComment.id,
-                body: summary
-              });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
+            try {
+              // Find existing coverage comment
+              const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: summary
               });
+              
+              const existingComment = comments.data.find(comment => 
+                comment.body.includes('## 📊 Test Coverage Report')
+              );
+              
+              if (existingComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                  body: summary
+                });
+                console.log('Updated existing coverage comment');
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: summary
+                });
+                console.log('Created new coverage comment');
+              }
+            } catch (error) {
+              console.log('Failed to comment on PR (this may be due to organization permissions):', error.message);
+              // Don't fail the workflow if commenting fails
             }
       
       # Step 9: Prepare coverage reports for deployment

@@ -1,6 +1,6 @@
 {
   "name": "@structured-world/project-nexus-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "SW: Project Nexus MCP",
   "packageManager": "yarn@4.9.4",
   "author": "Dmitry Prudnikov <mail@polaz.com>",

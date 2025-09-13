@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.1.0...v1.2.0) (2025-09-13)
+
+
+### Features
+
+* add comprehensive Docker support with minimal footprint ([354c331](https://github.com/structured-world/project-nexus-mcp/commit/354c3312358f7149cfce46a6ae9c37bf2ea94834))
+
 # [1.1.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.0.2...v1.1.0) (2025-09-13)
 
 

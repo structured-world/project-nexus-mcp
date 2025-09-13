@@ -12,7 +12,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
 
-
     /* Emit */
     "outDir": "./dist",
     "declaration": true,

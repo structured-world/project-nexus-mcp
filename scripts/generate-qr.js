@@ -10,8 +10,8 @@ const qrCodeSVG = await QRCode.toString(address, {
   margin: 2,
   color: {
     dark: '#000000',
-    light: '#FFFFFF'
-  }
+    light: '#FFFFFF',
+  },
 });
 
 // Save to file

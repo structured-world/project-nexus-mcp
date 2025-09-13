@@ -57,7 +57,7 @@ export default [
       '@typescript-eslint/prefer-as-const': 'error',
       // Правила для строгого контроля типов аргументов функций
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-extraneous-class': 'off'
+      '@typescript-eslint/no-extraneous-class': 'off',
     },
   },
   {

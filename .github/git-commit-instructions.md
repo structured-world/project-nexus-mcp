@@ -29,6 +29,7 @@ Use the Conventional Commits specification for all commit messages:
 ## Commit Message Guidelines
 
 ### Subject Line Rules
+
 - Use imperative mood: "Add feature" not "Added feature" or "Adds feature"
 - Keep subject line under 50 characters
 - Do not end with a period
@@ -59,6 +60,7 @@ test(integration): add end-to-end provider tests
 ### Breaking Changes
 
 For breaking changes, use either:
+
 - Add `!` after the type: `feat!: remove deprecated API endpoints`
 - Add `BREAKING CHANGE:` in the footer with explanation
 

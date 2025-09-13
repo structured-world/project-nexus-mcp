@@ -177,7 +177,9 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
       try {
         return await adapter.createWorkItem(data);
       } catch (error) {
-        console.error(`Adapter creation failed, falling back to legacy: ${String(error)}`);
+        console.error(
+          `Adapter creation failed, falling back to legacy: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -203,7 +205,9 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
       try {
         return await adapter.updateWorkItem(id, updates);
       } catch (error) {
-        console.error(`Adapter update failed, falling back to legacy: ${String(error)}`);
+        console.error(
+          `Adapter update failed, falling back to legacy: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -230,7 +234,9 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
         try {
           return await adapter.listWorkItems(filter);
         } catch (error) {
-          console.error(`Adapter listing failed, falling back to legacy: ${String(error)}`);
+          console.error(
+            `Adapter listing failed, falling back to legacy: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
@@ -257,7 +263,9 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
         const providerResults = await adapter.search(query);
         results.push(...providerResults);
       } catch (error) {
-        console.error(`Search failed for ${key}: ${String(error)}`);
+        console.error(
+          `Search failed for ${key}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 

@@ -15,4 +15,3 @@ Project Nexus is at an early stage. We have ambitious plans to expand its capabi
 - **Documentation & Examples:** Continuously improve documentation. Provide example configs for various scenarios (multi-project monorepos, enterprise setups) and publish walkthroughs (blog posts or videos) on using Nexus with different AI agents.
 
 Each release will be documented in the CHANGELOG. We welcome feedback on prioritizing these items – feel free to open issues or join discussions in the GitHub repo.
-

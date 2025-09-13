@@ -223,3 +223,16 @@ Project Nexus is open-source software, released under the MIT License. See the L
 ---
 
 Project Nexus is part of the Structured World initiative to bring structured, AI-driven productivity to developers. Together, we can streamline how AI works with all the tools we use every day.
+
+## Support the Project
+
+If you find Project Nexus useful, consider supporting its development. Your contributions help keep this project maintained and evolving.
+
+<div align="center">
+  <img src="assets/usdt-qr.svg" alt="USDT TRC-20 Donation QR Code" width="150" height="150">
+  <br>
+  <small>📱 <strong>USDT (TRC-20)</strong></small><br>
+  <code>TFDsezHa1cBkoeZT5q2T49Wp66K8t2DmdA</code>
+  <br><br>
+  <em>Scan with any TRC-20 compatible wallet</em>
+</div>

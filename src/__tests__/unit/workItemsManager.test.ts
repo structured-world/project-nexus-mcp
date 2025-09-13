@@ -343,10 +343,9 @@ describe('WorkItemsManager', () => {
   });
 
   describe('normalization methods', () => {
-    const manager = workItemsManager as any;
-
     describe('normalizeType', () => {
       it('should normalize work item types', () => {
+        const manager = workItemsManager as any;
         expect(manager.normalizeType('issue')).toBe('issue');
         expect(manager.normalizeType('TASK')).toBe('task');
         expect(manager.normalizeType('incident')).toBe('bug');
@@ -357,6 +356,7 @@ describe('WorkItemsManager', () => {
 
     describe('normalizeState', () => {
       it('should normalize work item states', () => {
+        const manager = workItemsManager as any;
         expect(manager.normalizeState('open')).toBe('open');
         expect(manager.normalizeState('opened')).toBe('open');
         expect(manager.normalizeState('CLOSED')).toBe('closed');
@@ -369,6 +369,7 @@ describe('WorkItemsManager', () => {
 
     describe('denormalizeState', () => {
       it('should denormalize states for different providers', () => {
+        const manager = workItemsManager as any;
         expect(manager.denormalizeState('open', 'github')).toBe('open');
         expect(manager.denormalizeState('closed', 'github')).toBe('closed');
         expect(manager.denormalizeState('open', 'gitlab')).toBe('opened');
@@ -380,6 +381,7 @@ describe('WorkItemsManager', () => {
 
     describe('normalizeAssignees', () => {
       it('should handle string assignee', () => {
+        const manager = workItemsManager as any;
         const item = { assignee: 'testuser' };
         const result = manager.normalizeAssignees(item);
 
@@ -389,6 +391,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should handle object assignee', () => {
+        const manager = workItemsManager as any;
         const item = {
           assignee: {
             username: 'testuser',
@@ -404,6 +407,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should handle assignees array', () => {
+        const manager = workItemsManager as any;
         const item = {
           assignees: [{ username: 'user1', name: 'User One' }, 'user2'],
         };
@@ -417,6 +421,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should handle assigned_to field', () => {
+        const manager = workItemsManager as any;
         const item = { assigned_to: { name: 'Assigned User' } };
         const result = manager.normalizeAssignees(item);
 
@@ -428,6 +433,7 @@ describe('WorkItemsManager', () => {
 
     describe('normalizeLabels', () => {
       it('should normalize label objects', () => {
+        const manager = workItemsManager as any;
         const item = {
           labels: [{ name: 'bug' }, { title: 'priority-high' }, 'feature'],
         };
@@ -437,6 +443,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should handle tags field', () => {
+        const manager = workItemsManager as any;
         const item = {
           tags: ['tag1', 'tag2', null, 'tag3'],
         };
@@ -446,6 +453,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should filter out empty labels', () => {
+        const manager = workItemsManager as any;
         const item = {
           labels: [{ name: 'bug' }, { name: '' }, { title: '' }, 'valid-label', ''],
         };
@@ -457,6 +465,7 @@ describe('WorkItemsManager', () => {
 
     describe('denormalizeWorkItem', () => {
       it('should denormalize for GitHub', () => {
+        const manager = workItemsManager as any;
         const item: Partial<WorkItem> = {
           title: 'Test',
           description: 'Description',
@@ -481,6 +490,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should denormalize for GitLab', () => {
+        const manager = workItemsManager as any;
         const item: Partial<WorkItem> = {
           title: 'Test',
           state: 'closed',
@@ -496,6 +506,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should denormalize for Azure', () => {
+        const manager = workItemsManager as any;
         const item: Partial<WorkItem> = {
           title: 'Test',
           state: 'open',
@@ -513,6 +524,7 @@ describe('WorkItemsManager', () => {
 
     describe('createProviderFields', () => {
       it('should create GitLab provider fields', () => {
+        const manager = workItemsManager as any;
         const item = { iid: 123, weight: 5 };
         const result = manager.createProviderFields(item, 'gitlab');
 
@@ -524,6 +536,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should create GitHub provider fields', () => {
+        const manager = workItemsManager as any;
         const item = { number: 123 };
         const result = manager.createProviderFields(item, 'github');
 
@@ -534,6 +547,7 @@ describe('WorkItemsManager', () => {
       });
 
       it('should create Azure provider fields', () => {
+        const manager = workItemsManager as any;
         const item = { id: 123, type: 'Bug', state: 'Active' };
         const result = manager.createProviderFields(item, 'azure');
 

@@ -113,21 +113,38 @@ export class EnhancedWorkItemsManager extends WorkItemsManager {
     const configured: string[] = [];
     const missing: Array<{ provider: string; reason: string }> = [];
 
-    this.configValidationResults.forEach((result) => {
-      if (result.isValid) {
-        configured.push(result.provider);
-      } else {
-        missing.push({
-          provider: result.provider,
-          reason: result.reason ?? 'Unknown configuration issue',
-        });
-      }
-    });
+    // If we have cached results, use them
+    if (this.configValidationResults.length > 0) {
+      this.configValidationResults.forEach((result) => {
+        if (result.isValid) {
+          configured.push(result.provider);
+        } else {
+          missing.push({
+            provider: result.provider,
+            reason: result.reason ?? 'Unknown configuration issue',
+          });
+        }
+      });
+    } else {
+      // Otherwise, validate all known providers on-demand
+      const providers: Provider[] = ['github', 'gitlab', 'azure'];
+      providers.forEach((provider) => {
+        const result = validateProviderConfig(provider);
+        if (result.isValid) {
+          configured.push(result.provider);
+        } else {
+          missing.push({
+            provider: result.provider,
+            reason: result.reason ?? 'Unknown configuration issue',
+          });
+        }
+      });
+    }
 
     return {
       configured,
       missing,
-      total: this.configValidationResults.length,
+      total: configured.length + missing.length,
     };
   }
 

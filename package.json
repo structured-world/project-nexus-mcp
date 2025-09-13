@@ -51,6 +51,7 @@
     "@modelcontextprotocol/sdk": "^1.18.0",
     "citty": "^0.1.6",
     "express": "^5.1.0",
+    "qrcode": "^1.5.4",
     "source-map-support": "^0.5.21"
   },
   "devDependencies": {

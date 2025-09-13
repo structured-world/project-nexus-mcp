@@ -224,6 +224,7 @@ describe('DefaultMigrationPipeline', () => {
           projectId: 456,
           weight: 8,
           timeEstimate: 3600,
+          healthStatus: 'on_track',
         },
       };
 
@@ -232,6 +233,7 @@ describe('DefaultMigrationPipeline', () => {
         mapLabels: new Map(),
         customFieldMapping: {
           weight: 'storyPoints',
+          healthStatus: 'targetCustomField',
         },
         handleMissingFields: 'metadata',
         preserveIds: false,
@@ -240,7 +242,7 @@ describe('DefaultMigrationPipeline', () => {
       const result = await pipeline.transform([gitlabExport], 'azure', options);
 
       expect(result.items[0].customFields).toHaveProperty('storyPoints', 8);
-      expect(result.items[0].customFields).toHaveProperty('targetCustomField', 'test-value');
+      expect(result.items[0].customFields).toHaveProperty('targetCustomField', 'on_track');
       expect(result.items[0].customFields).toHaveProperty('timeEstimate', 3600);
     });
 

@@ -184,10 +184,14 @@ export class DefaultMigrationPipeline implements MigrationPipeline {
     options: TransformOptions,
     result: TransformResult,
   ): Promise<WorkItemImport> {
+    // Validate required fields
+    if (!item.title) {
+      throw new Error(`Failed to transform item ${item.id}: Missing or invalid title`);
+    }
     // Map work item type using intelligent type mapper
     const mappingInput: MappingInput = {
-      provider: targetProvider,
-      process: targetProvider === 'azure' ? 'agile' : undefined, // Default to agile for Azure
+      provider: item.provider, // Source provider
+      process: targetProvider === 'azure' ? 'agile' : undefined, // Target Azure process
       title: item.title,
       description: item.description,
     };
@@ -480,6 +484,7 @@ export class DefaultMigrationPipeline implements MigrationPipeline {
     if (item.type === 'bug') return 'incident';
     if (item.type === 'task') return 'task';
     if (item.type === 'test') return 'test_case';
+    if (item.type === 'story') return 'issue'; // GitLab treats stories as issues
     return 'issue';
   }
 

@@ -123,10 +123,14 @@ export class WorkItemsManager {
 
     if (hasTextContent(result)) {
       const createdItemJson = result.content[0].text;
-      const createdItem: unknown = JSON.parse(createdItemJson);
+      try {
+        const createdItem: unknown = JSON.parse(createdItemJson);
 
-      if (isProviderAPIResponse(createdItem)) {
-        return this.normalizeWorkItem(createdItem, provider);
+        if (isProviderAPIResponse(createdItem)) {
+          return this.normalizeWorkItem(createdItem, provider);
+        }
+      } catch {
+        throw new Error('Failed to create work item');
       }
     }
 
@@ -266,7 +270,7 @@ export class WorkItemsManager {
     return normalized;
   }
 
-  private denormalizeWorkItem(
+  denormalizeWorkItem(
     item: Partial<WorkItem>,
     provider: string,
     project?: string,
@@ -310,7 +314,7 @@ export class WorkItemsManager {
     return denormalized;
   }
 
-  private normalizeType(type: string): WorkItem['type'] {
+  normalizeType(type: string): WorkItem['type'] {
     const typeMap: Record<string, WorkItem['type']> = {
       issue: 'issue',
       task: 'task',
@@ -324,7 +328,7 @@ export class WorkItemsManager {
     return typeMap[type.toLowerCase()] ?? 'issue';
   }
 
-  private normalizeState(status: string): 'open' | 'closed' {
+  normalizeState(status: string): 'open' | 'closed' {
     const statusMap: Record<string, 'open' | 'closed'> = {
       open: 'open',
       opened: 'open',
@@ -338,7 +342,7 @@ export class WorkItemsManager {
     return statusMap[status.toLowerCase()] ?? 'open';
   }
 
-  private denormalizeState(state: 'open' | 'closed', provider: string): string {
+  denormalizeState(state: 'open' | 'closed', provider: string): string {
     if (provider === 'github') {
       return state === 'closed' ? 'closed' : 'open';
     } else if (provider === 'gitlab') {
@@ -354,7 +358,7 @@ export class WorkItemsManager {
     return state;
   }
 
-  private normalizeAssignees(item: ProviderAPIResponse): import('../types/index.js').User[] {
+  normalizeAssignees(item: ProviderAPIResponse): import('../types/index.js').User[] {
     const assignees: import('../types/index.js').User[] = [];
 
     if (item.assignee) {
@@ -398,12 +402,12 @@ export class WorkItemsManager {
     return assignees;
   }
 
-  private normalizeAuthor(_item: ProviderAPIResponse): import('../types/index.js').User {
+  normalizeAuthor(_item: ProviderAPIResponse): import('../types/index.js').User {
     // Default author - in real implementation this would come from the API response
     return this.createUser('unknown', 'Unknown User');
   }
 
-  private createUser(username: string, displayName: string): import('../types/index.js').User {
+  createUser(username: string, displayName: string): import('../types/index.js').User {
     return {
       id: username,
       username,
@@ -412,7 +416,7 @@ export class WorkItemsManager {
     };
   }
 
-  private createProviderFields(
+  createProviderFields(
     item: ProviderAPIResponse,
     provider: string,
   ): import('../types/index.js').ProviderSpecificFields {
@@ -440,7 +444,7 @@ export class WorkItemsManager {
 
   // Removed unused normalizeMilestone method
 
-  private normalizeLabels(item: ProviderAPIResponse): string[] {
+  normalizeLabels(item: ProviderAPIResponse): string[] {
     if (item.labels && Array.isArray(item.labels)) {
       const validLabels: Array<string | { name: string } | { title: string }> =
         item.labels.filter(isLabelLike);

@@ -5,12 +5,14 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { ProviderConfig, ProviderInstance } from '../../types/index.js';
 import * as errorClassifier from '../../utils/errorClassifier.js';
+import { logger } from '../../utils/logger.js';
 
 // Mock MCP SDK
 jest.mock('@modelcontextprotocol/sdk/client/index.js');
 jest.mock('@modelcontextprotocol/sdk/client/stdio.js');
 jest.mock('@modelcontextprotocol/sdk/client/sse.js');
 jest.mock('../../utils/errorClassifier.js');
+jest.mock('../../utils/logger.js');
 
 const MockedClient = Client as jest.MockedClass<typeof Client>;
 const MockedStdioClientTransport = StdioClientTransport as jest.MockedClass<
@@ -24,6 +26,7 @@ const mockedShouldAttemptReconnection =
   errorClassifier.shouldAttemptReconnection as jest.MockedFunction<
     typeof errorClassifier.shouldAttemptReconnection
   >;
+const mockedLogger = logger as jest.Mocked<typeof logger>;
 
 describe('ProviderManager', () => {
   let providerManager: ProviderManager;
@@ -260,7 +263,7 @@ describe('ProviderManager', () => {
       const result = await providerManager.initializeProvider(validStdioConfig);
 
       expect(result.status).toBe('connected');
-      expect(mockStderrWrite).toHaveBeenCalledWith(
+      expect(mockedLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('Could not list tools for test-provider'),
       );
     });

@@ -12,11 +12,8 @@ import {
 import { ProviderManager } from '../providers/ProviderManager.js';
 import { WorkItemsManager } from '../abstraction/WorkItemsManager.js';
 import { NexusConfig, ProviderInstance } from '../types/index.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { createServer } from 'http';
 import express from 'express';
-import { TokenStorage } from '../utils/tokenStorage.js';
 import { logger } from '../utils/logger.js';
 
 export class NexusProxyServer {
@@ -26,7 +23,6 @@ export class NexusProxyServer {
   private config: NexusConfig;
   private httpServer?: ReturnType<typeof createServer>;
   private expressApp?: express.Application;
-  private tokenStorage: TokenStorage;
 
   constructor() {
     this.server = new Server(
@@ -46,7 +42,6 @@ export class NexusProxyServer {
 
     this.providerManager = new ProviderManager();
     this.workItemsManager = new WorkItemsManager(this.providerManager);
-    this.tokenStorage = new TokenStorage();
 
     this.config = {
       providers: [],
@@ -414,105 +409,10 @@ export class NexusProxyServer {
     return tools;
   }
 
-  async loadConfig(configPath?: string): Promise<void> {
-    const defaultPath = path.join(process.cwd(), '.mcp.json');
-    const finalPath = configPath ?? defaultPath;
-
-    try {
-      const configData = await fs.readFile(finalPath, 'utf-8');
-      const rawConfig: unknown = JSON.parse(configData);
-
-      if (rawConfig && typeof rawConfig === 'object') {
-        this.config = await this.parseConfig(rawConfig as Record<string, unknown>);
-        process.stdout.write(`Loaded configuration from ${finalPath}\n`);
-      } else {
-        throw new Error('Invalid configuration format');
-      }
-    } catch {
-      logger.log(`Could not load config from ${finalPath}, using environment variables`);
-      this.config = this.loadConfigFromEnv();
-    }
-  }
-
-  private async parseConfig(rawConfig: Record<string, unknown>): Promise<NexusConfig> {
-    const config: NexusConfig = {
-      providers: [],
-      projects:
-        typeof rawConfig.projects === 'object' && rawConfig.projects !== null
-          ? (rawConfig.projects as Record<string, string>)
-          : {},
-    };
-
-    // Load stored tokens
-    await this.tokenStorage.loadTokens();
-
-    if (process.env.DEFAULT_REPOSITORY) {
-      config.defaultRepository = process.env.DEFAULT_REPOSITORY;
-    }
-    if (process.env.DEFAULT_TASK) {
-      config.defaultTask = process.env.DEFAULT_TASK;
-    }
-
-    const providers = [];
-
-    if (process.env.GITHUB_TOKEN) {
-      providers.push({
-        id: 'github',
-        name: 'GitHub',
-        type: 'stdio' as const,
-        command: 'yarn',
-        args: ['dlx', '@modelcontextprotocol/server-github'],
-        env: {
-          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-        },
-        enabled: true,
-        autoUpdate: true,
-      });
-    }
-
-    if (process.env.GITLAB_TOKEN) {
-      providers.push({
-        id: 'gitlab',
-        name: 'GitLab',
-        type: 'stdio' as const,
-        command: 'uv',
-        args: [
-          'run',
-          '--python',
-          '3.13',
-          '--with',
-          'git+https://github.com/polaz/gitlab-mcp.git',
-          'python',
-          '-m',
-          'gitlab_mcp',
-        ],
-        env: {
-          GITLAB_PERSONAL_ACCESS_TOKEN: process.env.GITLAB_TOKEN,
-          GITLAB_API_URL: process.env.GITLAB_URL ?? 'https://gitlab.com/api/v4',
-        },
-        enabled: true,
-        autoUpdate: true,
-      });
-    }
-
-    if (process.env.AZURE_TOKEN && process.env.AZURE_ORG) {
-      providers.push({
-        id: 'azure',
-        name: 'Azure DevOps',
-        type: 'stdio' as const,
-        command: 'yarn',
-        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG],
-        env: {
-          AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
-        },
-        enabled: true,
-        autoUpdate: true,
-      });
-    }
-
-    config.providers = providers;
-
-    return config;
+  loadConfig(_configPath?: string): void {
+    // Always use environment variables only - no .mcp.json support
+    logger.log('Loading configuration from environment variables');
+    this.config = this.loadConfigFromEnv();
   }
 
   private loadConfigFromEnv(): NexusConfig {
@@ -592,7 +492,7 @@ export class NexusProxyServer {
   }
 
   async initialize(): Promise<void> {
-    await this.loadConfig();
+    this.loadConfig();
 
     logger.log(`\n=== Project Nexus MCP Server Initialization ===`);
     logger.log(`Found ${this.config.providers.length} provider(s) in configuration`);

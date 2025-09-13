@@ -3,7 +3,6 @@ import { WorkItem, ProviderAPIResponse, Priority } from '../types/index.js';
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { hasTextContent, isProviderAPIResponse, isLabelLike } from '../utils/typeGuards.js';
 import { CacheManager, ProjectCacheData, UserRole } from '../cache/CacheManager.js';
-
 export class WorkItemsManager {
   private cacheManager: CacheManager;
 
@@ -582,10 +581,10 @@ export class WorkItemsManager {
 
     // Try different project listing tools based on provider
     const projectTools = [
+      'search_repositories', // GitHub has this
       'list_repositories',
       'list_projects',
       'get_repositories',
-      'search_repositories',
       'list_user_repositories',
       'list_org_repositories',
     ];
@@ -607,8 +606,20 @@ export class WorkItemsManager {
             const projectsJson = result.content[0].text;
             const parsedProjects: unknown = JSON.parse(projectsJson);
 
+            // Handle both array responses and GitHub-style object responses
+            let projectArray: unknown[] = [];
             if (Array.isArray(parsedProjects)) {
-              for (const project of parsedProjects) {
+              projectArray = parsedProjects;
+            } else if (typeof parsedProjects === 'object' && parsedProjects !== null) {
+              // GitHub search API returns { items: [...], total_count: number }
+              const searchResult = parsedProjects as Record<string, unknown>;
+              if (Array.isArray(searchResult.items)) {
+                projectArray = searchResult.items;
+              }
+            }
+
+            if (projectArray.length > 0) {
+              for (const project of projectArray) {
                 if (typeof project === 'object' && project !== null) {
                   const proj = project as Record<string, unknown>;
                   const projectId =
@@ -766,12 +777,12 @@ export class WorkItemsManager {
 
     // Try different user listing tools based on provider
     const userTools = [
+      'search_users', // GitHub has this
       'list_users',
       'get_users',
       'list_org_members',
       'get_org_members',
       'list_team_members',
-      'search_users',
     ];
 
     for (const toolSuffix of userTools) {
@@ -791,8 +802,20 @@ export class WorkItemsManager {
             const usersJson = result.content[0].text;
             const parsedUsers: unknown = JSON.parse(usersJson);
 
+            // Handle both array responses and GitHub-style object responses
+            let userArray: unknown[] = [];
             if (Array.isArray(parsedUsers)) {
-              for (const user of parsedUsers) {
+              userArray = parsedUsers;
+            } else if (typeof parsedUsers === 'object' && parsedUsers !== null) {
+              // GitHub search API returns { items: [...], total_count: number }
+              const searchResult = parsedUsers as Record<string, unknown>;
+              if (Array.isArray(searchResult.items)) {
+                userArray = searchResult.items;
+              }
+            }
+
+            if (userArray.length > 0) {
+              for (const user of userArray) {
                 if (typeof user === 'object' && user !== null) {
                   const usr = user as Record<string, unknown>;
                   users.push({

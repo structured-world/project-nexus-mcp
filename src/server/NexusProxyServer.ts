@@ -480,6 +480,7 @@ export class NexusProxyServer {
         args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG],
         env: {
           AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
+          YARN_NODE_LINKER: 'node-modules',
         },
         enabled: true,
         autoUpdate: true,

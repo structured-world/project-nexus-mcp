@@ -273,6 +273,59 @@ export class NexusProxyServer {
         };
       }
 
+      case 'nexus_search_projects': {
+        const query = typeof args.query === 'string' ? args.query : undefined;
+        const projects = await this.workItemsManager.searchProjects(query);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(projects, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_search_users': {
+        const query = typeof args.query === 'string' ? args.query : undefined;
+        const users = await this.workItemsManager.searchUsers(query);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(users, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_get_project_users': {
+        if (typeof args.project_id !== 'string') {
+          throw new Error('project_id parameter must be a string');
+        }
+        const users = this.workItemsManager.getProjectUsers(args.project_id);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(users, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'nexus_cache_stats': {
+        const stats = this.workItemsManager.getCacheStats();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(stats, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'nexus_transfer_work_item': {
         if (typeof args.source_id !== 'string' || typeof args.target_project !== 'string') {
           throw new Error('source_id and target_project parameters must be strings');
@@ -733,7 +786,35 @@ export class NexusProxyServer {
     // Print final status
     this.printProviderStatus();
 
+    // Start cache warming after providers are initialized
+    this.startCacheWarming();
+
     this.providerManager.startAutoUpdate(3600000); // 1 hour
+  }
+
+  /**
+   * Start cache warming process for projects and users
+   */
+  private startCacheWarming(): void {
+    const connectedProviders = this.providerManager
+      .getAllProviders()
+      .filter((p) => p.status === 'connected');
+
+    if (connectedProviders.length === 0) {
+      logger.log('[cache] No connected providers, skipping cache warming');
+      return;
+    }
+
+    // Start cache warming in the background (don't await)
+    setTimeout(async () => {
+      try {
+        await this.workItemsManager.warmupCaches();
+      } catch (error) {
+        logger.error(
+          `[cache] Cache warmup failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }, 2000); // Wait 2 seconds after server startup to avoid interfering with initialization
   }
 
   async runStdio(): Promise<void> {
@@ -1216,6 +1297,9 @@ export class NexusProxyServer {
 
   async shutdown(): Promise<void> {
     logger.log(`\\n🛑 Shutting down Project Nexus MCP Server...`);
+
+    // Shutdown cache manager first
+    this.workItemsManager.getCacheManager().shutdown();
 
     await this.providerManager.shutdown();
 

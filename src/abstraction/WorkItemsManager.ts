@@ -2,9 +2,22 @@ import { ProviderManager } from '../providers/ProviderManager.js';
 import { WorkItem, ProviderAPIResponse, Priority } from '../types/index.js';
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { hasTextContent, isProviderAPIResponse, isLabelLike } from '../utils/typeGuards.js';
+import { CacheManager, ProjectCacheData, UserRole } from '../cache/CacheManager.js';
 
 export class WorkItemsManager {
-  constructor(protected providerManager: ProviderManager) {}
+  private cacheManager: CacheManager;
+
+  constructor(
+    protected providerManager: ProviderManager,
+    cacheManager?: CacheManager,
+  ) {
+    this.cacheManager = cacheManager ?? new CacheManager();
+
+    // Set up cache refresh callback
+    this.cacheManager.onCacheExpired = (cacheKey: string) => {
+      this.handleCacheExpired(cacheKey);
+    };
+  }
 
   protected detectProviderFromProject(project: string): string {
     const [provider] = project.split(':');
@@ -15,38 +28,86 @@ export class WorkItemsManager {
     const workItems: WorkItem[] = [];
 
     if (project) {
-      const provider = this.detectProviderFromProject(project);
-      const providerInstance = this.providerManager.getProvider(provider);
+      // Check if project has provider prefix (contains ':')
+      if (project.includes(':')) {
+        // Handle project with provider prefix
+        const provider = this.detectProviderFromProject(project);
+        const providerInstance = this.providerManager.getProvider(provider);
 
-      if (!providerInstance) {
-        throw new Error(`Provider ${provider} not found`);
-      }
+        if (!providerInstance) {
+          throw new Error(`Provider ${provider} not found`);
+        }
 
-      const toolName = `${provider}_list_issues`;
+        const toolName = `${provider}_list_issues`;
 
-      try {
-        const result = await this.providerManager.callTool(toolName, {
-          ...filters,
-          project: project.split(':')[1],
-        });
+        try {
+          const result = await this.providerManager.callTool(toolName, {
+            ...filters,
+            project: project.split(':')[1],
+          });
 
-        if (hasTextContent(result)) {
-          const itemsJson = result.content[0].text;
-          const parsedItems: unknown = JSON.parse(itemsJson);
+          if (hasTextContent(result)) {
+            const itemsJson = result.content[0].text;
+            const parsedItems: unknown = JSON.parse(itemsJson);
 
-          if (Array.isArray(parsedItems)) {
-            for (const item of parsedItems) {
-              if (isProviderAPIResponse(item)) {
-                workItems.push(this.normalizeWorkItem(item, provider));
+            if (Array.isArray(parsedItems)) {
+              for (const item of parsedItems) {
+                if (isProviderAPIResponse(item)) {
+                  workItems.push(this.normalizeWorkItem(item, provider));
+                }
               }
             }
           }
+        } catch (error) {
+          if (error instanceof Error) {
+            process.stderr.write(`Error listing work items from ${provider}: ${error.message}\n`);
+          } else {
+            process.stderr.write(`Error listing work items from ${provider}: ${String(error)}\n`);
+          }
         }
-      } catch (error) {
-        if (error instanceof Error) {
-          process.stderr.write(`Error listing work items from ${provider}: ${error.message}\n`);
-        } else {
-          process.stderr.write(`Error listing work items from ${provider}: ${String(error)}\n`);
+      } else {
+        // Handle project without provider prefix - search across all providers
+        process.stderr.write(`Searching for project "${project}" across all providers...\n`);
+
+        for (const provider of this.providerManager.getAllProviders()) {
+          if (provider.status !== 'connected') continue;
+
+          const listTools = ['list_issues', 'list_work_items', 'list_tasks'];
+
+          for (const toolSuffix of listTools) {
+            const toolName = `${provider.id}_${toolSuffix}`;
+            if (provider.tools.has(toolName)) {
+              try {
+                // Search with project as a filter parameter
+                const searchFilters = {
+                  ...filters,
+                  project: project,
+                  project_path: project,
+                  repository: project,
+                  repo: project,
+                };
+
+                const result = await this.providerManager.callTool(toolName, searchFilters);
+
+                if (hasTextContent(result)) {
+                  const itemsJson = result.content[0].text;
+                  const parsedItems: unknown = JSON.parse(itemsJson);
+
+                  if (Array.isArray(parsedItems)) {
+                    for (const item of parsedItems) {
+                      if (isProviderAPIResponse(item)) {
+                        workItems.push(this.normalizeWorkItem(item, provider.id));
+                      }
+                    }
+                  }
+                }
+                break;
+              } catch (error) {
+                // Continue to next provider on error - project might not exist in this provider
+                process.stderr.write(`No results from ${provider.id} for project "${project}"\n`);
+              }
+            }
+          }
         }
       }
     } else {
@@ -461,19 +522,436 @@ export class WorkItemsManager {
     return [];
   }
 
+  async searchProjects(query?: string): Promise<ProjectCacheData[]> {
+    // Try to use cached data first
+    const cachedResults = this.cacheManager.searchProjects(query);
+    if (cachedResults.length > 0) {
+      process.stderr.write(`[cache] Serving ${cachedResults.length} projects from cache\n`);
+      return cachedResults;
+    }
+
+    // If no cache or cache is empty, fetch fresh data
+    process.stderr.write('[cache] No cached projects found, fetching fresh data...\n');
+
+    const projects: ProjectCacheData[] = [];
+
+    for (const provider of this.providerManager.getAllProviders()) {
+      if (provider.status !== 'connected') continue;
+
+      // Check if we have valid cache for this provider
+      if (this.cacheManager.hasValidCache(provider.id, 'projects')) {
+        const cached = this.cacheManager.getProjects(provider.id);
+        if (cached) {
+          projects.push(...cached);
+          continue; // Skip API call for this provider
+        }
+      }
+
+      // Fetch fresh data for this provider
+      const providerProjects = await this.fetchProjectsFromProvider(provider.id);
+      projects.push(...providerProjects);
+
+      // Cache the results for this provider
+      this.cacheManager.setProjects(provider.id, providerProjects);
+    }
+
+    // Apply query filter if provided
+    if (query) {
+      const searchTerm = query.toLowerCase();
+      return projects.filter(
+        (project) =>
+          project.name.toLowerCase().includes(searchTerm) ||
+          project.id.toLowerCase().includes(searchTerm) ||
+          project.description?.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    return projects;
+  }
+
+  /**
+   * Fetch projects from a specific provider (used for cache warming)
+   */
+  async fetchProjectsFromProvider(providerId: string): Promise<ProjectCacheData[]> {
+    const provider = this.providerManager.getProvider(providerId);
+    if (!provider || provider.status !== 'connected') {
+      return [];
+    }
+
+    const projects: ProjectCacheData[] = [];
+
+    // Try different project listing tools based on provider
+    const projectTools = [
+      'list_repositories',
+      'list_projects',
+      'get_repositories',
+      'search_repositories',
+      'list_user_repositories',
+      'list_org_repositories',
+    ];
+
+    for (const toolSuffix of projectTools) {
+      const toolName = `${providerId}_${toolSuffix}`;
+      if (provider.tools.has(toolName)) {
+        try {
+          const result = await this.providerManager.callTool(toolName, {});
+
+          if (hasTextContent(result)) {
+            const projectsJson = result.content[0].text;
+            const parsedProjects: unknown = JSON.parse(projectsJson);
+
+            if (Array.isArray(parsedProjects)) {
+              for (const project of parsedProjects) {
+                if (typeof project === 'object' && project !== null) {
+                  const proj = project as Record<string, unknown>;
+                  const projectId =
+                    proj.full_name || proj.path_with_namespace || proj.name || proj.id;
+                  const projectName = proj.name || proj.title || projectId;
+
+                  if (projectId && projectName) {
+                    // Also fetch project members if available
+                    const members = await this.fetchProjectMembers(providerId, String(projectId));
+
+                    projects.push({
+                      id: `${providerId}:${projectId}`,
+                      name: String(projectName),
+                      provider: providerId,
+                      description: proj.description ? String(proj.description) : undefined,
+                      url:
+                        proj.html_url || proj.web_url
+                          ? String(proj.html_url || proj.web_url)
+                          : undefined,
+                      members,
+                    });
+                  }
+                }
+              }
+            }
+          }
+          break; // Found a working tool for this provider
+        } catch (error) {
+          // Continue to next tool
+          continue;
+        }
+      }
+    }
+
+    return projects;
+  }
+
+  /**
+   * Fetch project members for a specific project
+   */
+  async fetchProjectMembers(providerId: string, projectPath: string): Promise<UserRole[]> {
+    const provider = this.providerManager.getProvider(providerId);
+    if (!provider || provider.status !== 'connected') {
+      return [];
+    }
+
+    const memberTools = [
+      'list_project_members',
+      'get_project_members',
+      'list_collaborators',
+      'get_collaborators',
+      'list_team_members',
+    ];
+
+    for (const toolSuffix of memberTools) {
+      const toolName = `${providerId}_${toolSuffix}`;
+      if (provider.tools.has(toolName)) {
+        try {
+          const result = await this.providerManager.callTool(toolName, {
+            project: projectPath,
+            project_id: projectPath,
+            repo: projectPath,
+            repository: projectPath,
+          });
+
+          if (hasTextContent(result)) {
+            const membersJson = result.content[0].text;
+            const parsedMembers: unknown = JSON.parse(membersJson);
+
+            if (Array.isArray(parsedMembers)) {
+              return parsedMembers.map((member) => {
+                const mem = member as Record<string, unknown>;
+                return {
+                  userId: String(mem.id || mem.user_id || mem.username),
+                  username: String(mem.username || mem.login || mem.name),
+                  displayName: String(mem.name || mem.display_name || mem.username || mem.login),
+                  email: mem.email ? String(mem.email) : undefined,
+                  role: String(mem.role || mem.permission || mem.access_level || 'member'),
+                  accessLevel: typeof mem.access_level === 'number' ? mem.access_level : undefined,
+                } as UserRole;
+              });
+            }
+          }
+          break; // Found a working tool
+        } catch (error) {
+          // Continue to next tool
+          continue;
+        }
+      }
+    }
+
+    return []; // No members found or no working tool
+  }
+
+  /**
+   * Handle cache expiration - trigger refresh
+   */
+  private async handleCacheExpired(cacheKey: string): Promise<void> {
+    const [type, provider] = cacheKey.split(':');
+
+    if (type === 'projects') {
+      process.stderr.write(`[cache] Refreshing projects cache for ${provider}...\n`);
+      try {
+        const projects = await this.fetchProjectsFromProvider(provider);
+        this.cacheManager.setProjects(provider, projects);
+      } catch (error) {
+        process.stderr.write(`[cache] Failed to refresh projects for ${provider}: ${error}\n`);
+      }
+    } else if (type === 'users') {
+      process.stderr.write(`[cache] Refreshing users cache for ${provider}...\n`);
+      try {
+        const users = await this.fetchUsersFromProvider(provider);
+        this.cacheManager.setUsers(provider, users);
+      } catch (error) {
+        process.stderr.write(`[cache] Failed to refresh users for ${provider}: ${error}\n`);
+      }
+    }
+  }
+
+  /**
+   * Fetch users from a specific provider (used for cache warming)
+   */
+  async fetchUsersFromProvider(providerId: string): Promise<UserRole[]> {
+    const provider = this.providerManager.getProvider(providerId);
+    if (!provider || provider.status !== 'connected') {
+      return [];
+    }
+
+    const users: UserRole[] = [];
+
+    // Try different user listing tools based on provider
+    const userTools = [
+      'list_users',
+      'get_users',
+      'list_org_members',
+      'get_org_members',
+      'list_team_members',
+      'search_users',
+    ];
+
+    for (const toolSuffix of userTools) {
+      const toolName = `${providerId}_${toolSuffix}`;
+      if (provider.tools.has(toolName)) {
+        try {
+          const result = await this.providerManager.callTool(toolName, {});
+
+          if (hasTextContent(result)) {
+            const usersJson = result.content[0].text;
+            const parsedUsers: unknown = JSON.parse(usersJson);
+
+            if (Array.isArray(parsedUsers)) {
+              for (const user of parsedUsers) {
+                if (typeof user === 'object' && user !== null) {
+                  const usr = user as Record<string, unknown>;
+                  users.push({
+                    userId: String(usr.id || usr.user_id || usr.username),
+                    username: String(usr.username || usr.login || usr.name),
+                    displayName: String(usr.name || usr.display_name || usr.username || usr.login),
+                    email: usr.email ? String(usr.email) : undefined,
+                    role: String(usr.role || usr.permission || usr.access_level || 'member'),
+                    accessLevel:
+                      typeof usr.access_level === 'number' ? usr.access_level : undefined,
+                  });
+                }
+              }
+            }
+          }
+          break; // Found a working tool for this provider
+        } catch (error) {
+          // Continue to next tool
+          continue;
+        }
+      }
+    }
+
+    return users;
+  }
+
+  /**
+   * Search users across all providers (with caching)
+   */
+  async searchUsers(query?: string): Promise<UserRole[]> {
+    // Try to use cached data first
+    const cachedResults = this.cacheManager.searchUsers(query);
+    if (cachedResults.length > 0) {
+      process.stderr.write(`[cache] Serving ${cachedResults.length} users from cache\n`);
+      return cachedResults;
+    }
+
+    // If no cache or cache is empty, fetch fresh data
+    process.stderr.write('[cache] No cached users found, fetching fresh data...\n');
+
+    const users: UserRole[] = [];
+
+    for (const provider of this.providerManager.getAllProviders()) {
+      if (provider.status !== 'connected') continue;
+
+      // Check if we have valid cache for this provider
+      if (this.cacheManager.hasValidCache(provider.id, 'users')) {
+        const cached = this.cacheManager.getUsers(provider.id);
+        if (cached) {
+          users.push(...cached);
+          continue; // Skip API call for this provider
+        }
+      }
+
+      // Fetch fresh data for this provider
+      const providerUsers = await this.fetchUsersFromProvider(provider.id);
+      users.push(...providerUsers);
+
+      // Cache the results for this provider
+      this.cacheManager.setUsers(provider.id, providerUsers);
+    }
+
+    // Apply query filter if provided
+    if (query) {
+      const searchTerm = query.toLowerCase();
+      return users.filter(
+        (user) =>
+          user.username.toLowerCase().includes(searchTerm) ||
+          user.displayName.toLowerCase().includes(searchTerm) ||
+          user.email?.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    return users;
+  }
+
+  /**
+   * Get users for a specific project (from cache)
+   */
+  getProjectUsers(projectId: string): UserRole[] {
+    return this.cacheManager.getProjectUsers(projectId);
+  }
+
+  /**
+   * Warm up caches for all connected providers
+   */
+  async warmupCaches(): Promise<void> {
+    process.stderr.write('[cache] Starting cache warmup...\n');
+
+    const providers = this.providerManager
+      .getAllProviders()
+      .filter((p) => p.status === 'connected');
+
+    // Warm up projects and users in parallel for each provider
+    const warmupPromises = providers.map(async (provider) => {
+      try {
+        // Warm up projects cache
+        process.stderr.write(`[cache] Warming up projects for ${provider.id}...\n`);
+        const projects = await this.fetchProjectsFromProvider(provider.id);
+        this.cacheManager.setProjects(provider.id, projects);
+
+        // Warm up users cache
+        process.stderr.write(`[cache] Warming up users for ${provider.id}...\n`);
+        const users = await this.fetchUsersFromProvider(provider.id);
+        this.cacheManager.setUsers(provider.id, users);
+
+        process.stderr.write(`[cache] Warmup completed for ${provider.id}\n`);
+      } catch (error) {
+        process.stderr.write(`[cache] Warmup failed for ${provider.id}: ${error}\n`);
+      }
+    });
+
+    await Promise.all(warmupPromises);
+    process.stderr.write('[cache] Cache warmup completed for all providers\n');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return this.cacheManager.getStats();
+  }
+
+  /**
+   * Get cache manager instance (for external use)
+   */
+  getCacheManager(): CacheManager {
+    return this.cacheManager;
+  }
+
   createUnifiedTools(): Tool[] {
     return [
       {
+        name: 'nexus_search_projects',
+        description:
+          'Search for projects/repositories across all configured providers. Use this to discover project identifiers before using other work item tools. Results are cached for 15 minutes.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description:
+                'Optional search query to filter projects by name or description. If omitted, lists all available projects.',
+            },
+          },
+        },
+      },
+      {
+        name: 'nexus_search_users',
+        description:
+          'Search for users across all configured providers. Returns user information including roles and access levels in projects. Results are cached for 15 minutes.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description:
+                'Optional search query to filter users by username, display name, or email. If omitted, lists all available users.',
+            },
+          },
+        },
+      },
+      {
+        name: 'nexus_get_project_users',
+        description:
+          'Get users/members for a specific project. Returns cached user data with their roles in the project.',
+        inputSchema: {
+          type: 'object',
+          required: ['project_id'],
+          properties: {
+            project_id: {
+              type: 'string',
+              description:
+                'Project identifier in format "provider:project_path" (e.g., "gitlab:myorg/myproject")',
+            },
+          },
+        },
+      },
+      {
+        name: 'nexus_cache_stats',
+        description:
+          'Get cache statistics showing what data is cached and cache age/TTL information.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
         name: 'nexus_list_work_items',
         description:
-          'List work items (issues, tasks, etc.) from all configured providers or a specific project',
+          'List work items (issues, tasks, etc.). BEHAVIOR: If project parameter is omitted, searches ALL configured providers. If project is specified with provider prefix (e.g., "gitlab:myorg/myproject"), searches only that specific project. To find work items from a project when you don\'t know the provider, omit the project parameter and use other filters like labels or assignee.',
         inputSchema: {
           type: 'object',
           properties: {
             project: {
               type: 'string',
               description:
-                'Optional project identifier (e.g., "github:owner/repo", "gitlab:group/project")',
+                'Optional project identifier with provider prefix (e.g., "github:owner/repo", "gitlab:group/project", "azure:projectname"). If omitted, searches all providers. DO NOT pass raw project names without provider prefix.',
             },
             status: {
               type: 'string',

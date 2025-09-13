@@ -564,7 +564,7 @@ describe('WorkItemsManager', () => {
     it('should create unified tools schema', () => {
       const tools = workItemsManager.createUnifiedTools();
 
-      expect(tools).toHaveLength(4);
+      expect(tools).toHaveLength(8); // Added 4 new cache-related tools
 
       const listTool = tools.find((t) => t.name === 'nexus_list_work_items');
       expect(listTool).toBeDefined();

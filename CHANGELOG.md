@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.5...v1.4.0) (2025-09-13)
+
+
+### Features
+
+* implement file-based logging and standardize environment variables ([1d2cb53](https://github.com/structured-world/project-nexus-mcp/commit/1d2cb5339c3aa8a07acb1f454fbd8bc4452c5948))
+
 ## [1.3.5](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.4...v1.3.5) (2025-09-13)
 
 

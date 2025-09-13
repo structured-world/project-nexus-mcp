@@ -1,3 +1,15 @@
+# [2.1.0](https://github.com/structured-world/project-nexus-mcp/compare/v2.0.0...v2.1.0) (2025-09-13)
+
+
+### Bug Fixes
+
+* resolve linting errors in cache implementation ([708bcb0](https://github.com/structured-world/project-nexus-mcp/commit/708bcb0b6930979970c2546d69543baff1d27ec1))
+
+
+### Features
+
+* implement cache system for projects and users with auto-warming ([1c75469](https://github.com/structured-world/project-nexus-mcp/commit/1c75469952f6b23a8bff2305033ac496867f15b7))
+
 # [2.0.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.2...v2.0.0) (2025-09-13)
 
 

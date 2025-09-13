@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.2.0...v1.3.0) (2025-09-13)
+
+
+### Features
+
+* add GitHub Pages deployment for coverage reports ([1185a86](https://github.com/structured-world/project-nexus-mcp/commit/1185a868d406c3759621292727ba4117f1bd467b))
+
 # [1.2.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.1.0...v1.2.0) (2025-09-13)
 
 

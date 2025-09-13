@@ -234,5 +234,5 @@ If you find Project Nexus useful, consider supporting its development. Your cont
   <small>📱 <strong>USDT (TRC-20)</strong></small><br>
   <code>TFDsezHa1cBkoeZT5q2T49Wp66K8t2DmdA</code>
   <br><br>
-  <em>Scan with any TRC-20 compatible wallet</em>
+  <em>Scan with any TRC-20 compatible wallet (TronLink, Trust Wallet, Exodus, etc.)</em>
 </div>

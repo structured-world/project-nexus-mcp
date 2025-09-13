@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.4.0...v1.5.0) (2025-09-13)
+
+
+### Features
+
+* add environment-controlled logging mode and fix npm/yarn conflicts ([3f07388](https://github.com/structured-world/project-nexus-mcp/commit/3f073881f3143de452ea201ed832ed01e36fd1b2))
+
 # [1.4.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.5...v1.4.0) (2025-09-13)
 
 

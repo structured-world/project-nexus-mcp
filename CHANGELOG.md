@@ -1,3 +1,10 @@
+## [1.6.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.1...v1.6.2) (2025-09-13)
+
+
+### Bug Fixes
+
+* suppress Yarn progress output causing MCP JSON parsing errors ([283d4d9](https://github.com/structured-world/project-nexus-mcp/commit/283d4d9b194f05196e35e7a9452b9f3ac7027067))
+
 ## [1.6.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.0...v1.6.1) (2025-09-13)
 
 

@@ -1,0 +1,30 @@
+# Git attributes for Project Nexus MCP
+
+# Exclude coverage reports from language detection
+coverage/** linguist-generated=true
+
+# Mark test files as test code
+**/*.test.ts linguist-language=TypeScript
+**/*.spec.ts linguist-language=TypeScript
+
+# Ensure TypeScript is detected properly
+*.ts linguist-language=TypeScript
+
+# Documentation files
+*.md linguist-documentation=true
+CLAUDE.md linguist-documentation=true
+PROVIDERS.md linguist-documentation=true
+ROADMAP.md linguist-documentation=true
+INSTALLATION.md linguist-documentation=true
+CONTRIBUTING.md linguist-documentation=true
+GITHUB_PAGES_SETUP.md linguist-documentation=true
+
+# Configuration files
+.yarnrc.yml linguist-language=YAML
+docker-compose*.yml linguist-language=YAML
+.github/workflows/*.yml linguist-language=YAML
+
+# Generated files
+dist/** linguist-generated=true
+node_modules/** linguist-vendored=true
+.yarn/** linguist-vendored=true

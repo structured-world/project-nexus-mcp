@@ -3,9 +3,7 @@
 ![npm version](https://img.shields.io/npm/v/@structured-world/project-nexus-mcp)
 ![npm downloads](https://img.shields.io/npm/dm/@structured-world/project-nexus-mcp)
 ![Release](https://github.com/structured-world/project-nexus-mcp/workflows/Release/badge.svg)
-![PR Checks](https://github.com/structured-world/project-nexus-mcp/workflows/Pull%20Request%20Checks/badge.svg)
-![GitHub issues](https://img.shields.io/github/issues/structured-world/project-nexus-mcp)
-![GitHub license](https://img.shields.io/github/license/structured-world/project-nexus-mcp)
+![Codecov](https://codecov.io/gh/structured-world/project-nexus-mcp/branch/main/graph/badge.svg)
 
 Project Nexus is a Model Context Protocol (MCP) server that provides fine-grained, unified access to your development tasks, source code, and CI/CD pipelines across multiple platforms. It enables AI assistants to seamlessly interact with GitLab, GitHub, Azure DevOps, and more through one unified interface.
 

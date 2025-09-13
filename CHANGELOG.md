@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/structured-world/project-nexus-mcp/compare/v2.1.0...v2.1.1) (2025-09-13)
+
+
+### Bug Fixes
+
+* resolve project search and cache warming issues with improved tool descriptions ([1b3eee1](https://github.com/structured-world/project-nexus-mcp/commit/1b3eee18f0c349c3a87e28ca5cbc58e3599201e5))
+
 # [2.1.0](https://github.com/structured-world/project-nexus-mcp/compare/v2.0.0...v2.1.0) (2025-09-13)
 
 

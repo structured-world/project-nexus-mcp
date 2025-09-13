@@ -1,0 +1,307 @@
+# Project Nexus MCP - Docker Compose Configuration
+# 
+# This docker-compose.yml provides a complete setup for running Project Nexus
+# as a containerized MCP (Model Context Protocol) proxy server with support
+# for GitHub, GitLab, and Azure DevOps integrations.
+#
+# Usage:
+#   Development: docker-compose up -d
+#   Production:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Custom env:  docker-compose --env-file .env.custom up -d
+
+services:
+  # Main Project Nexus MCP Server
+  nexus-mcp:
+    # Use the official GHCR image or build locally
+    image: ghcr.io/structured-world/project-nexus-mcp:latest
+    # Uncomment to build from local source instead:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    
+    container_name: nexus-mcp
+    restart: unless-stopped
+    
+    # Network configuration
+    ports:
+      # HTTP/SSE server port (default: 3000)
+      # Format: "host_port:container_port"
+      - "${NEXUS_HTTP_PORT:-3000}:3000"
+    
+    # Environment Variables - Core Configuration
+    environment:
+      # ===========================================
+      # CORE APPLICATION SETTINGS
+      # ===========================================
+      
+      # Node.js runtime environment
+      # Options: development, production, test
+      NODE_ENV: "${NODE_ENV:-production}"
+      
+      # HTTP server port (must match container port above)
+      PORT: "${PORT:-3000}"
+      
+      # Enable debug logging and additional tools
+      # Set to "true" to enable debug MCP tools (restart providers, exit server)
+      # WARNING: Debug tools should only be enabled in development environments
+      NEXUS_DEBUG_TOOLS: "${NEXUS_DEBUG_TOOLS:-false}"
+      
+      # ===========================================
+      # GITHUB INTEGRATION
+      # ===========================================
+      
+      # GitHub Personal Access Token
+      # Generate at: https://github.com/settings/tokens
+      # Required scopes: repo, read:org, read:user, admin:org (for advanced features)
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      
+      # GitHub organization name (if working with org repositories)
+      # Can be omitted if using personal repositories or project mappings
+      GITHUB_ORG: "${GITHUB_ORG:-}"
+      
+      # ===========================================
+      # GITLAB INTEGRATION  
+      # ===========================================
+      
+      # GitLab Personal Access Token
+      # Generate at: https://gitlab.com/-/user_settings/personal_access_tokens
+      # Required scopes: api, read_api, read_repository, write_repository
+      GITLAB_TOKEN: "${GITLAB_TOKEN:-}"
+      
+      # GitLab instance URL (defaults to gitlab.com)
+      # For self-hosted GitLab: https://gitlab.yourcompany.com
+      GITLAB_URL: "${GITLAB_URL:-https://gitlab.com}"
+      
+      # GitLab group/namespace (optional)
+      # Used for organization-wide operations
+      GITLAB_GROUP: "${GITLAB_GROUP:-}"
+      
+      # ===========================================
+      # AZURE DEVOPS INTEGRATION
+      # ===========================================
+      
+      # Azure DevOps Personal Access Token
+      # Generate at: https://dev.azure.com/{organization}/_usersSettings/tokens
+      # Required scopes: Work Items (Read & Write), Code (Read), Project and Team (Read)
+      AZURE_DEVOPS_PAT: "${AZURE_DEVOPS_PAT:-}"
+      
+      # Azure DevOps organization name
+      # Example: if your URL is https://dev.azure.com/mycompany, use "mycompany"
+      AZURE_ORG: "${AZURE_ORG:-}"
+      
+      # Azure DevOps project name
+      # Can be omitted if using project mappings in configuration file
+      AZURE_PROJECT: "${AZURE_PROJECT:-}"
+      
+      # Azure DevOps API version (optional)
+      # Defaults to latest stable version
+      AZURE_API_VERSION: "${AZURE_API_VERSION:-7.0}"
+      
+      # ===========================================
+      # ADVANCED CONFIGURATION
+      # ===========================================
+      
+      # Configuration file path (optional)
+      # Mount a custom .mcp.json file for advanced project mappings
+      NEXUS_CONFIG_PATH: "${NEXUS_CONFIG_PATH:-}"
+      
+      # Request timeout for provider operations (milliseconds)
+      # Default: 30000 (30 seconds)
+      NEXUS_REQUEST_TIMEOUT: "${NEXUS_REQUEST_TIMEOUT:-30000}"
+      
+      # Provider update interval (milliseconds)  
+      # How often to check for provider updates
+      # Default: 3600000 (1 hour)
+      NEXUS_UPDATE_INTERVAL: "${NEXUS_UPDATE_INTERVAL:-3600000}"
+      
+      # Maximum reconnection attempts for failed providers
+      # Default: 5
+      NEXUS_MAX_RECONNECT_ATTEMPTS: "${NEXUS_MAX_RECONNECT_ATTEMPTS:-5}"
+      
+      # ===========================================
+      # MONITORING & LOGGING
+      # ===========================================
+      
+      # Log level for application output
+      # Options: error, warn, info, debug, trace
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      
+      # Enable structured JSON logging
+      # Set to "true" for machine-readable logs
+      LOG_JSON: "${LOG_JSON:-false}"
+      
+      # Disable color output in logs (useful for log aggregation)
+      NO_COLOR: "${NO_COLOR:-false}"
+      
+      # ===========================================
+      # SECURITY SETTINGS
+      # ===========================================
+      
+      # CORS origins for HTTP server (comma-separated)
+      # Default: * (allow all origins)
+      # Production: specify allowed origins explicitly
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      
+      # Rate limiting (requests per minute per IP)
+      # Set to 0 to disable rate limiting
+      RATE_LIMIT_PER_MINUTE: "${RATE_LIMIT_PER_MINUTE:-60}"
+      
+      # API key for authentication (optional)
+      # If set, clients must provide this key in Authorization header
+      API_KEY: "${API_KEY:-}"
+    
+    # Volume mounts for persistent configuration and data
+    volumes:
+      # Custom configuration file (optional)
+      # Create a .mcp.json file with project mappings and provider settings
+      # - "./config/.mcp.json:/app/.mcp.json:ro"
+      
+      # Log directory for persistent logging (optional)
+      # - "./logs:/app/logs"
+      
+      # SSL certificates for HTTPS (if needed)
+      # - "./certs:/app/certs:ro"
+      
+      # Custom provider configurations (advanced)
+      # - "./providers:/app/providers:ro"
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          # Maximum memory usage
+          memory: 512M
+          # Maximum CPU usage (1.0 = 1 CPU core)
+          cpus: '0.5'
+        reservations:
+          # Guaranteed memory
+          memory: 256M
+          # Guaranteed CPU
+          cpus: '0.25'
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network configuration
+    networks:
+      - nexus-network
+
+  # Optional: Redis for caching and session management
+  # Uncomment if you need persistent caching or session storage
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: nexus-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   command: redis-server --appendonly yes
+  #   networks:
+  #     - nexus-network
+
+  # Optional: Monitoring with Prometheus metrics
+  # Uncomment if you need metrics collection
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: nexus-prometheus
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus-data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--web.console.libraries=/etc/prometheus/console_libraries'
+  #     - '--web.console.templates=/etc/prometheus/consoles'
+  #   networks:
+  #     - nexus-network
+
+# Network definitions
+networks:
+  nexus-network:
+    driver: bridge
+    # Enable IPv6 support (optional)
+    # enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volume definitions for persistent data
+volumes:
+  # Redis data (if using Redis)
+  # redis-data:
+  #   driver: local
+  
+  # Prometheus data (if using Prometheus)
+  # prometheus-data:
+  #   driver: local
+  
+  # Application logs
+  # nexus-logs:
+  #   driver: local
+
+# ===========================================
+# QUICK START EXAMPLES
+# ===========================================
+#
+# 1. Minimal setup (GitHub only):
+#    export GITHUB_TOKEN=ghp_your_token_here
+#    export GITHUB_ORG=your-org
+#    docker-compose up -d
+#
+# 2. Full setup (all providers):
+#    export GITHUB_TOKEN=ghp_your_token_here
+#    export GITLAB_TOKEN=glpat_your_token_here  
+#    export AZURE_DEVOPS_PAT=your_pat_here
+#    export AZURE_ORG=your-org
+#    docker-compose up -d
+#
+# 3. Development mode with debug tools:
+#    export NEXUS_DEBUG_TOOLS=true
+#    export NODE_ENV=development
+#    docker-compose up -d
+#
+# 4. Custom port and configuration:
+#    export NEXUS_HTTP_PORT=8080
+#    export PORT=8080
+#    docker-compose up -d
+#
+# ===========================================
+# ENVIRONMENT FILE EXAMPLES
+# ===========================================
+#
+# Create a .env file in the same directory as this docker-compose.yml:
+#
+# # .env.production
+# NODE_ENV=production
+# NEXUS_HTTP_PORT=3000
+# GITHUB_TOKEN=ghp_your_github_token
+# GITLAB_TOKEN=glpat_your_gitlab_token
+# AZURE_DEVOPS_PAT=your_azure_pat
+# AZURE_ORG=your-azure-org
+# LOG_LEVEL=info
+# NEXUS_DEBUG_TOOLS=false
+#
+# # .env.development  
+# NODE_ENV=development
+# NEXUS_HTTP_PORT=3001
+# NEXUS_DEBUG_TOOLS=true
+# LOG_LEVEL=debug
+# LOG_JSON=false
+#
+# Usage: docker-compose --env-file .env.production up -d

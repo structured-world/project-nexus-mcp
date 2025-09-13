@@ -1,0 +1,233 @@
+# Production override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file contains production-specific configurations that override
+# the base docker-compose.yml settings for enhanced security, performance,
+# and reliability in production environments.
+
+services:
+  nexus-mcp:
+    # Production image pinning (use specific version instead of latest)
+    # Uncomment and specify a specific version tag for production
+    # image: ghcr.io/structured-world/project-nexus-mcp:v1.0.0
+    
+    # Production environment overrides
+    environment:
+      # Ensure production mode
+      NODE_ENV: production
+      
+      # Disable debug tools in production
+      NEXUS_DEBUG_TOOLS: "false"
+      
+      # Production logging
+      LOG_LEVEL: info
+      LOG_JSON: "true"
+      NO_COLOR: "true"
+      
+      # Enhanced security settings
+      CORS_ORIGINS: "${PROD_CORS_ORIGINS:-https://yourdomain.com}"
+      RATE_LIMIT_PER_MINUTE: "${PROD_RATE_LIMIT:-30}"
+      
+      # Performance tuning
+      NEXUS_REQUEST_TIMEOUT: "20000"  # 20 seconds for production
+    
+    # Production resource limits (more restrictive)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Production health check (more frequent)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        compress: "true"
+    
+    # Production security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (if your app supports it)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp:size=100M,noexec,nosuid,nodev
+    
+    # Production port binding (only localhost)
+    ports:
+      - "127.0.0.1:${NEXUS_HTTP_PORT:-3000}:3000"
+    
+    # Production volumes (with proper permissions)
+    volumes:
+      # Production configuration (read-only)
+      - "./config/prod.mcp.json:/app/.mcp.json:ro"
+      
+      # Persistent logs directory
+      - "nexus-logs:/app/logs"
+      
+      # SSL certificates (if using HTTPS)
+      # - "./certs:/app/certs:ro"
+
+  # Production reverse proxy (Nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: nexus-nginx
+    restart: unless-stopped
+    ports:
+      # HTTP (redirect to HTTPS)
+      - "80:80"
+      # HTTPS
+      - "443:443"
+    volumes:
+      # Nginx configuration
+      - "./config/nginx.conf:/etc/nginx/nginx.conf:ro"
+      - "./config/nginx.d:/etc/nginx/conf.d:ro"
+      
+      # SSL certificates
+      - "./certs:/etc/nginx/certs:ro"
+      
+      # Static files (if any)
+      - "./static:/var/www/html:ro"
+      
+      # Logs
+      - "nginx-logs:/var/log/nginx"
+    
+    depends_on:
+      - nexus-mcp
+    
+    networks:
+      - nexus-network
+    
+    # Nginx security and performance settings
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Production monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nexus-prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus-data:/prometheus"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - nexus-network
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.3'
+
+  # Production log aggregation with Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: nexus-loki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - "./monitoring/loki.yml:/etc/loki/local-config.yaml:ro"
+      - "loki-data:/loki"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - nexus-network
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+
+  # Production metrics visualization with Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nexus-grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - "grafana-data:/var/lib/grafana"
+      - "./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - nexus-network
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+
+# Production volume definitions
+volumes:
+  nexus-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+  
+  nginx-logs:
+    driver: local
+  
+  prometheus-data:
+    driver: local
+  
+  loki-data:
+    driver: local
+  
+  grafana-data:
+    driver: local
+
+# Production network with custom subnet
+networks:
+  nexus-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

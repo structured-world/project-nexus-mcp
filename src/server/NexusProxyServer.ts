@@ -452,8 +452,8 @@ export class NexusProxyServer {
         id: 'github',
         name: 'GitHub',
         type: 'stdio' as const,
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-github'],
+        command: 'yarn',
+        args: ['dlx', '@modelcontextprotocol/server-github'],
         env: {
           GITHUB_TOKEN: process.env.GITHUB_TOKEN,
         },
@@ -492,8 +492,8 @@ export class NexusProxyServer {
         id: 'azure',
         name: 'Azure DevOps',
         type: 'stdio' as const,
-        command: 'npx',
-        args: ['-y', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
+        command: 'yarn',
+        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
         env: {
           AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },
@@ -528,8 +528,8 @@ export class NexusProxyServer {
         id: 'github',
         name: 'GitHub',
         type: 'stdio' as const,
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-github'],
+        command: 'yarn',
+        args: ['dlx', '@modelcontextprotocol/server-github'],
         env: {
           GITHUB_TOKEN: process.env.GITHUB_TOKEN,
         },
@@ -568,8 +568,8 @@ export class NexusProxyServer {
         id: 'azure',
         name: 'Azure DevOps',
         type: 'stdio' as const,
-        command: 'npx',
-        args: ['-y', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
+        command: 'yarn',
+        args: ['dlx', '@azure-devops/mcp', process.env.AZURE_ORG ?? 'your-org'],
         env: {
           AZURE_DEVOPS_PAT: process.env.AZURE_TOKEN,
         },

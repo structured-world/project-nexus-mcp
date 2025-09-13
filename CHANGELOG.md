@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.0...v1.3.1) (2025-09-13)
+
+
+### Bug Fixes
+
+* improve GitHub Pages workflow permissions and error handling ([4c53c86](https://github.com/structured-world/project-nexus-mcp/commit/4c53c868f4d7094eae5e0be08f0b28c2c647d89e))
+
 # [1.3.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.2.0...v1.3.0) (2025-09-13)
 
 

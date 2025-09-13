@@ -1,17 +1,24 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+export type LoggingMode = 'file' | 'stderr' | 'auto';
+
 export class Logger {
   private static instance: Logger | undefined;
   private logFile: string;
   private isStdioMode: boolean = false;
+  private loggingMode: LoggingMode;
 
   private constructor() {
     const date = new Date().toISOString().split('T')[0];
     const sessionId = Math.random().toString(36).substring(2, 8);
     this.logFile = path.join('/tmp', `.log.nexus.${date}-${sessionId}`);
 
-    // Create log file if it doesn't exist
+    // Get logging mode from environment variable
+    const envMode = process.env.NEXUS_LOG_MODE?.toLowerCase() as LoggingMode;
+    this.loggingMode = ['file', 'stderr', 'auto'].includes(envMode) ? envMode : 'auto';
+
+    // Create log file if it doesn't exist (for file mode)
     this.ensureLogFile();
   }
 
@@ -24,6 +31,19 @@ export class Logger {
     this.isStdioMode = enabled;
   }
 
+  private shouldUseFileLogging(): boolean {
+    switch (this.loggingMode) {
+      case 'file':
+        return true;
+      case 'stderr':
+        return false;
+      case 'auto':
+      default:
+        // Auto mode: file for STDIO, stderr for HTTP/SSE
+        return this.isStdioMode;
+    }
+  }
+
   private ensureLogFile(): void {
     try {
       if (!fs.existsSync(this.logFile)) {
@@ -34,7 +54,7 @@ export class Logger {
       }
     } catch {
       // Fallback to stderr if we can't create log file
-      if (!this.isStdioMode) {
+      if (!this.shouldUseFileLogging()) {
         console.error('Failed to create log file, falling back to stderr');
       }
     }
@@ -57,15 +77,15 @@ export class Logger {
       const logLine = `[${timestamp}] [${level}] ${formattedMessage}\n`;
       fs.appendFileSync(this.logFile, logLine);
     } catch {
-      // Silent fail - don't pollute stderr in STDIO mode
-      if (!this.isStdioMode) {
+      // Silent fail - don't pollute stderr when using file logging
+      if (!this.shouldUseFileLogging()) {
         console.error('Failed to write to log file');
       }
     }
   }
 
   log(message: string, ...args: unknown[]): void {
-    if (this.isStdioMode) {
+    if (this.shouldUseFileLogging()) {
       this.writeToFile('INFO', message, ...args);
     } else {
       console.log(message, ...args);
@@ -73,7 +93,7 @@ export class Logger {
   }
 
   error(message: string, ...args: unknown[]): void {
-    if (this.isStdioMode) {
+    if (this.shouldUseFileLogging()) {
       this.writeToFile('ERROR', message, ...args);
     } else {
       console.error(message, ...args);
@@ -81,7 +101,7 @@ export class Logger {
   }
 
   warn(message: string, ...args: unknown[]): void {
-    if (this.isStdioMode) {
+    if (this.shouldUseFileLogging()) {
       this.writeToFile('WARN', message, ...args);
     } else {
       console.warn(message, ...args);
@@ -89,7 +109,7 @@ export class Logger {
   }
 
   debug(message: string, ...args: unknown[]): void {
-    if (this.isStdioMode) {
+    if (this.shouldUseFileLogging()) {
       this.writeToFile('DEBUG', message, ...args);
     } else {
       console.debug(message, ...args);

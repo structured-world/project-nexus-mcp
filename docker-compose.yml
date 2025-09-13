@@ -46,6 +46,12 @@ services:
       # WARNING: Debug tools should only be enabled in development environments
       NEXUS_DEBUG_TOOLS: "${NEXUS_DEBUG_TOOLS:-false}"
       
+      # Logging mode: "auto" (default), "file", or "stderr"
+      # auto: file for STDIO, stderr for HTTP/SSE
+      # file: always log to /tmp/.log.nexus.{date}-{session} files
+      # stderr: always log to stderr (Docker-friendly)
+      NEXUS_LOG_MODE: "${NEXUS_LOG_MODE:-auto}"
+      
       # ===========================================
       # GITHUB INTEGRATION
       # ===========================================
@@ -318,6 +324,7 @@ volumes:
 # # Debug and Development
 # LOG_LEVEL=info
 # NEXUS_DEBUG_TOOLS=false  # Set to true for debug tools
+# NEXUS_LOG_MODE=auto  # auto (default), file, or stderr
 #
 # # .env.development  
 # NODE_ENV=development

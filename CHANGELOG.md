@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.0.1...v1.0.2) (2025-09-13)
+
+
+### Bug Fixes
+
+* add publishConfig for scoped package publishing ([1731426](https://github.com/structured-world/project-nexus-mcp/commit/173142607680adc18a8eb0b21abf26f83e6dd925))
+
 ## [1.0.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.0.0...v1.0.1) (2025-09-13)
 
 

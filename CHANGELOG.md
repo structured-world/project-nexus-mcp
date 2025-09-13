@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.1...v1.5.2) (2025-09-13)
+
+
+### Bug Fixes
+
+* enhance Azure MCP startup debugging and improve logging system ([39ebaf3](https://github.com/structured-world/project-nexus-mcp/commit/39ebaf3110d37021b122599245996ca98d187451))
+
 ## [1.5.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.0...v1.5.1) (2025-09-13)
 
 

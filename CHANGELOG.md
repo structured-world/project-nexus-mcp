@@ -1,3 +1,10 @@
+## [1.5.3](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.2...v1.5.3) (2025-09-13)
+
+
+### Bug Fixes
+
+* convert debug logging from stderr to unified logger system ([19541fc](https://github.com/structured-world/project-nexus-mcp/commit/19541fc449444e6508bcf51bf13d6e3d8efa420b))
+
 ## [1.5.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.1...v1.5.2) (2025-09-13)
 
 

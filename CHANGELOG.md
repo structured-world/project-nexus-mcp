@@ -1,3 +1,10 @@
+## [1.3.3](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.2...v1.3.3) (2025-09-13)
+
+
+### Bug Fixes
+
+* add authentication to security scan for GHCR access ([f15aa96](https://github.com/structured-world/project-nexus-mcp/commit/f15aa96f7430bc45979c37d4a3d138d9d2d0d21d))
+
 ## [1.3.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.3.1...v1.3.2) (2025-09-13)
 
 

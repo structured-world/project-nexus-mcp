@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.0.2...v1.1.0) (2025-09-13)
+
+
+### Features
+
+* enhance MCP server update system with queuing and debug tools ([3b45c5a](https://github.com/structured-world/project-nexus-mcp/commit/3b45c5a9270917093aac6a8b8105bd1ef9043cdb))
+
 ## [1.0.2](https://github.com/structured-world/project-nexus-mcp/compare/v1.0.1...v1.0.2) (2025-09-13)
 
 

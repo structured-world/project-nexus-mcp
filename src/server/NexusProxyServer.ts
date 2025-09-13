@@ -494,7 +494,18 @@ export class NexusProxyServer {
   async initialize(): Promise<void> {
     this.loadConfig();
 
-    logger.log(`\n=== Project Nexus MCP Server Initialization ===`);
+    // Read version from package.json
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    try {
+      const packageJsonPath = path.join(process.cwd(), 'package.json');
+      const packageData = await fs.readFile(packageJsonPath, 'utf-8');
+      const { version } = JSON.parse(packageData) as { version: string };
+      logger.log(`\n=== Project Nexus MCP Server v${version} ===`);
+    } catch {
+      logger.log(`\n=== Project Nexus MCP Server Initialization ===`);
+    }
+
     logger.log(`Found ${this.config.providers.length} provider(s) in configuration`);
 
     // Initialize all providers asynchronously without blocking

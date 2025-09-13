@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/structured-world/project-nexus-mcp/compare/v1.6.0...v1.6.1) (2025-09-13)
+
+
+### Bug Fixes
+
+* add YARN_NODE_LINKER=node-modules for Azure MCP compatibility ([758c8ec](https://github.com/structured-world/project-nexus-mcp/commit/758c8ec6362897d250d63b5235d1839b3f503f6a))
+
 # [1.6.0](https://github.com/structured-world/project-nexus-mcp/compare/v1.5.3...v1.6.0) (2025-09-13)
 
 

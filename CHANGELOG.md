@@ -1,3 +1,13 @@
+## [2.1.2](https://github.com/structured-world/project-nexus-mcp/compare/v2.1.1...v2.1.2) (2025-09-14)
+
+
+### Bug Fixes
+
+* include yarn release file to resolve GitHub Actions corepack errors ([cc75cab](https://github.com/structured-world/project-nexus-mcp/commit/cc75cab73de2195906d55926cbddde7d3f68749d))
+* resolve ALL linting errors in abstraction layer ([02bd44b](https://github.com/structured-world/project-nexus-mcp/commit/02bd44b50f848051d57723d1fa2f056c3a8cb0b0))
+* resolve cache warming issues for GitHub search APIs ([21917c3](https://github.com/structured-world/project-nexus-mcp/commit/21917c36a699f67f5077a2a4eb5d59308ba0ab63))
+* resolve shutdown sequence and provider integration issues ([84e8adb](https://github.com/structured-world/project-nexus-mcp/commit/84e8adb748ab25ac75e7996311503171c1f8947e))
+
 ## [2.1.1](https://github.com/structured-world/project-nexus-mcp/compare/v2.1.0...v2.1.1) (2025-09-13)
 
 

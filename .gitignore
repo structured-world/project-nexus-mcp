@@ -16,8 +16,7 @@ node_modules/
 PROVIDERS.md
 dist/
 test-server.sh
-yarn/*
-!.yarn/releases
+.yarn
 
 # Test coverage reports (published to GitHub Pages instead)
 coverage/
